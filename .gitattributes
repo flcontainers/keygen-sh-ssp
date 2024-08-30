@@ -1,0 +1,12 @@
+*           text=auto
+*.conf		text eol=lf
+*.css       text
+*.html      text
+*.ico		-text
+*.jpg		-text
+*.js		text
+*.json      text
+*.mjs		text
+*.sh		text eol=lf
+*.txt		text
+*.yaml		text

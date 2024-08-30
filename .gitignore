@@ -1,3 +1,9 @@
+# Specific
+**/.env
+**/.parcel-cache/*
+**/dist/*
+**/node_modules/*
+
 # Logs
 logs
 *.log

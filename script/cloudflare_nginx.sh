@@ -9,7 +9,7 @@ if [ "$CLOUDFLARE" = "1" ]; then
     CF_IPV6_URL="https://www.cloudflare.com/ips-v6"
 
     # Define the path to your NGINX configuration file
-    NGINX_CONF="/etc/nginx/nginx.conf"
+    NGINX_CONF="/etc/nginx/conf.d/default.conf"
 
     # Download the Cloudflare IP lists
     CF_IPV4=$(curl -s $CF_IPV4_URL)
@@ -18,30 +18,35 @@ if [ "$CLOUDFLARE" = "1" ]; then
     # Backup the original NGINX configuration file
     cp $NGINX_CONF "${NGINX_CONF}.backup"
 
-    # Remove existing Cloudflare IPs in nginx.conf (optional)
+    # Remove existing Cloudflare IPs in default.conf (optional)
     sed -i '/set_real_ip_from/d' $NGINX_CONF
     sed -i '/real_ip_header CF-Connecting-IP;/d' $NGINX_CONF
+    sed -i '/real_ip_recursive on;/d' $NGINX_CONF
 
     # Create a temporary file to hold the new configuration content
     TEMP_FILE=$(mktemp /tmp/cloudflare.XXXXXX)
 
-    # Add the Cloudflare IPs to the temporary file
-    echo "# Cloudflare IPs" > $TEMP_FILE
+    # Add the Cloudflare IPs to the temporary file with proper indentation
+    echo "    # Cloudflare IPs" > $TEMP_FILE
     for ip in $CF_IPV4; do
-        echo "set_real_ip_from $ip;" >> $TEMP_FILE
+        echo "    set_real_ip_from $ip;" >> $TEMP_FILE
     done
     for ip in $CF_IPV6; do
-        echo "set_real_ip_from $ip;" >> $TEMP_FILE
+        echo "    set_real_ip_from $ip;" >> $TEMP_FILE
     done
 
-    # Add the real_ip_header directive
-    echo "real_ip_header CF-Connecting-IP;" >> $TEMP_FILE
+    # Add the real_ip_header and real_ip_recursive directives with proper indentation
+    echo "    real_ip_header CF-Connecting-IP;" >> $TEMP_FILE
+    echo "    real_ip_recursive on;" >> $TEMP_FILE
 
-    # Insert the content of the temporary file before the include directive in nginx.conf
-    sed -i "/include \/etc\/nginx\/conf.d\/\*.conf;/r $TEMP_FILE" $NGINX_CONF
+    # Insert the content of the temporary file after the line containing "#Cloudflare"
+    sed -i "/#Cloudflare/ r $TEMP_FILE" $NGINX_CONF
 
     # Clean up the temporary file
     rm -f $TEMP_FILE
+
+    # Reload NGINX to apply the new configuration
+    #nginx -s reload
 
     echo "NGINX configuration updated successfully."
 

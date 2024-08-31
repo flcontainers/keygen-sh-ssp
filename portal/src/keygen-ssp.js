@@ -504,7 +504,6 @@ const LicenseActivationPortal = () => {
     return (
       <div className='demo' data-title='Activation Status'>
         <LicenseErrors />
-        <LicenseInfo />
         {errors.some(e => e.code === 'MACHINE_LIMIT_EXCEEDED')
           ? <LicenseManager />
           : null}

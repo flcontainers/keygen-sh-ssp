@@ -84,6 +84,11 @@ body {
   border: lightsalmon;
 }
 
+.demo-component button.demo-component__button--new-key {
+  background: orange;
+  border: orange;
+}
+
 .demo-component code,
 .demo-component pre {
   font-family: ui-monospace, Menlo, Monaco, "Cascadia Mono", "Segoe UI Mono", "Roboto Mono", "Oxygen Mono", "Ubuntu Monospace", "Source Code Pro", "Fira Mono", "Droid Sans Mono", "Courier New", monospace;

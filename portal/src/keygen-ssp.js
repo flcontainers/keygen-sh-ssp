@@ -505,18 +505,40 @@ const LicenseValidator = () => {
   const { key, validateLicenseKeyWithKey, setKey } = useLicensingStore();
   const validateLicenseKeyAction = validateLicenseKeyWithKey;
 
+  const handleRequestLicense = () => {
+    const recipient = process.env.REQUEST_EMAIL;
+    const subject = 'Request new license';
+    const body = `Hi License team,\n\nI would like to request a new license.\n-- Account information --\nEmail: ${userEmail}\nUsername: ${userName}\n\n-- Personal Details --\nSurname: *\nName: *\nReason for request:\n(Text here *)\n\n\nThank you\n\n${userName}`;
+
+    const mailtoLink = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.location.href = mailtoLink;
+  };
+
   return (
-    <div className='demo-component'>
+    <><div className='demo-component'>
       <h2>
-        <small>Activation Status</small>
+        <small>Check Activation Status</small>
       </h2>
-      <p>Please enter a license key and fingerprint</p>
+      <p>Please enter a license key</p>
       <LicenseKeyInput
         keyValue={key}
         onKeyChange={setKey}
-        onSubmit={validateLicenseKeyAction}
-      />
-    </div>
+        onSubmit={validateLicenseKeyAction} />
+      </div>
+      <div className='demo-component'>
+        <h2>
+          <small>New Key Request</small>
+        </h2>
+        <button className='demo-component__button demo-component__button--new-key' type='button' onClick={handleRequestLicense}>Request License</button>
+        <p>
+          <small>
+            <span>Note:</span><br />
+            <code>As part of the request and activation process, the following mandatory information will be stored:</code><br />
+            <code>Name, Surname, Email, IP, Machine Name, Machine fingerprint</code>
+          </small>
+        </p>
+      </div>
+    </>
   );
 };
 

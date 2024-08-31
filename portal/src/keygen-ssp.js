@@ -73,6 +73,27 @@ const client = {
     }
   },
 
+  async deactivateMachineForLicense(license, id) {
+    const res = await fetch(`https://${KEYGEN_URL}/v1/accounts/${KEYGEN_ACCOUNT_ID}/machines/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `License ${license.attributes.key}`,
+        'Accept': 'application/json',
+        'Keygen-Version': '1.2',
+      },
+    })
+
+    if (res.status === 204) {
+      return {}
+    }
+
+    const { errors } = await res.json()
+
+    return {
+      errors,
+    }
+  },
+
   async listMachinesForLicense(license) {
     const res = await fetch(`${KEYGEN_URL}/v1/accounts/${KEYGEN_ACCOUNT_ID}/machines`, {
       method: 'GET',

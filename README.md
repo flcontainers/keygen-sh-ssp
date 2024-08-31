@@ -26,5 +26,6 @@ __Keygen data:__
 __Other data:__
 - DOMAIN * (domain of the ssp portal) / e.g. my-domain.com:port (port if required)
 - REQUEST_EMAIL (Support Email for license request)
+- CLOUDFLARE (0 or 1 to use real IP from cloudflare)
 
 Note: You can use a local .env at root of the application or container variables...

@@ -42,7 +42,9 @@ COPY nginx/proxy.conf /etc/nginx/conf.d/default.conf
 
 # Copy a custom startup script
 COPY script/startup.sh /startup.sh
-RUN chmod +x /startup.sh
+COPY script/cloudflare_nginx.sh /cloudflare_nginx.sh
+RUN chmod +x /*.sh
+
 
 WORKDIR /app/node/portal
 #USER www-data

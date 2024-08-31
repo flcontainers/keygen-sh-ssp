@@ -21,14 +21,12 @@ const enforceOriginCheck = (req, res, next) => {
   const origin = req.headers.origin;
 
   if (origin) {
-      // Extract the protocol from the request
-      const protocol = req.protocol + '://';
+      // Construct the allowed origins with both HTTP and HTTPS
+      const allowedHttpOrigin = 'http://' + allowedDomain;
+      const allowedHttpsOrigin = 'https://' + allowedDomain;
 
-      // Construct the allowed origin with the protocol
-      const allowedOrigin = protocol + allowedDomain;
-
-      if (origin === allowedOrigin) {
-          // Allow the request if the origin matches
+      if (origin === allowedHttpOrigin || origin === allowedHttpsOrigin) {
+          // Allow the request if the origin matches either HTTP or HTTPS
           next();
       } else {
           // Block the request if the origin doesn't match

@@ -44,7 +44,7 @@ COPY nginx/proxy.conf /etc/nginx/conf.d/default.conf
 COPY script/startup.sh /startup.sh
 RUN chmod +x /startup.sh
 
-WORKDIR /app/portal
+WORKDIR /app/node/portal
 #USER www-data
 
 EXPOSE 80

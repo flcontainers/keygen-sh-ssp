@@ -15,20 +15,19 @@ const KEYGEN_URL = process.env.KEYGEN_URL;
 const KEYGEN_ACCOUNT_ID = process.env.KEYGEN_ACCOUNT_ID;
 const KEYGEN_TOKEN = process.env.KEYGEN_TOKEN;
 
-
 // Custom middleware to enforce origin checks
 const enforceOriginCheck = (req, res, next) => {
   const origin = req.headers.origin;
+  console.log("[Backend] Detected Origin:", origin);
 
   if (origin) {
-      // Extract the protocol from the request
-      const protocol = req.protocol + '://';
+      // Construct the allowed origins with both HTTP and HTTPS
+      const allowedHttpOrigin = 'http://' + allowedDomain;
+      const allowedHttpsOrigin = 'https://' + allowedDomain;
+      console.log("[Backend] Allowed Origins:", allowedHttpOrigin, allowedHttpsOrigin);
 
-      // Construct the allowed origin with the protocol
-      const allowedOrigin = protocol + allowedDomain;
-
-      if (origin === allowedOrigin) {
-          // Allow the request if the origin matches
+      if (origin === allowedHttpOrigin || origin === allowedHttpsOrigin) {
+          // Allow the request if the origin matches either HTTP or HTTPS
           next();
       } else {
           // Block the request if the origin doesn't match

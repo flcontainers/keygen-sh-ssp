@@ -74,7 +74,7 @@ const client = {
   },
 
   async deactivateMachineForLicense(license, id) {
-    const res = await fetch(`https://${KEYGEN_URL}/v1/accounts/${KEYGEN_ACCOUNT_ID}/machines/${id}`, {
+    const res = await fetch(`${KEYGEN_URL}/v1/accounts/${KEYGEN_ACCOUNT_ID}/machines/${id}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `License ${license.attributes.key}`,

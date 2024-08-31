@@ -303,9 +303,9 @@ const LicenseInfo = ({ showSeats = true }) => {
                   </td>
                 : null}
               <td>
-                {validation?.valid
-                ? <code>{validation?.code}</code>
-                : <button className='demo-component__button demo-component__button--renew-key' type='button' onClick={handleRenewClick}>Renew</button>}
+                {validation?.valid && validation?.code === 'FINGERPRINT_SCOPE_REQUIRED'
+                  ? <code>{validation?.code}</code>
+                  : <button className='demo-component__button demo-component__button--renew-key' type='button' onClick={handleRenewClick}>Renew</button>}
               </td>
               <td>
                 <button className='demo-component__button demo-component__button--logout' type='button' onClick={reset}>

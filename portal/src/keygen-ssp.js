@@ -46,7 +46,7 @@ const client = {
         errors: [{ title: 'Network error', detail: 'Failed to reach the server or process the request.' }],
       };
     }
-  },  
+  },
 
   async validateLicenseKeyWithKey(key, fingerprint) {
     const res = await fetch(`${KEYGEN_URL}/v1/accounts/${KEYGEN_ACCOUNT_ID}/licenses/actions/validate-key`, {
@@ -69,6 +69,27 @@ const client = {
     return {
       meta,
       data,
+      errors,
+    }
+  },
+
+  async deactivateMachineForLicense(license, id) {
+    const res = await fetch(`${KEYGEN_URL}/v1/accounts/${KEYGEN_ACCOUNT_ID}/machines/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `License ${license.attributes.key}`,
+        'Accept': 'application/json',
+        'Keygen-Version': '1.2',
+      },
+    })
+
+    if (res.status === 204) {
+      return {}
+    }
+
+    const { errors } = await res.json()
+
+    return {
       errors,
     }
   },
@@ -141,34 +162,41 @@ const useLicensingStore = createStore((set, get) => ({
   validateLicenseKeyWithKey: async () => {
     const { key, listMachinesForLicense } = get();
   
-    try {
-      // Step 1: Query the external API to get the fingerprint
-      const { fingerprint, errors } = await client.queryAndValidateLicenseKey(key, userEmail);
+    // Step 1: Query the external API to get the fingerprint
+    const { fingerprint, errors } = await client.queryAndValidateLicenseKey(key, userEmail);
   
-      if (errors) {
+    if (errors) {
+      // Check if the error is "Machine not found"
+      const machineNotFoundError = errors.find(error => error.title === 'Machine not found');
+  
+      // If there's an error and it's not "Machine not found", return it
+      if (!machineNotFoundError) {
         return set(state => ({ ...state, errors }));
       }
-  
-      // Step 2: Update the store with the fingerprint
-      set(state => ({ ...state, fingerprint }));
-  
-      // Step 3: Proceed with license validation using the fingerprint
-      const { meta, data, errors: validationErrors } = await client.validateLicenseKeyWithKey(key, fingerprint);
-      if (validationErrors) {
-        return set(state => ({ ...state, errors: validationErrors }));
-      }
-  
-      set(state => ({ ...state, validation: meta, license: data }));
-  
-      // List machines for the license if it exists (regardless of validity)
-      if (data != null) {
-        listMachinesForLicense();
-      }
-    } catch (error) {
-      // Handle errors and update the store with the error
-      set(state => ({ ...state, errors: [error.message] }));
+      
+      // Log or handle the "Machine not found" error if needed
+      console.warn('Machine not found error occurred, continuing...');
     }
-  },
+  
+    // Step 2: Update the store with the fingerprint (if available)
+    if (fingerprint) {
+      set(state => ({ ...state, fingerprint }));
+    }
+  
+    // Step 3: Proceed with license validation using the fingerprint
+    const { meta, data, errors: validationErrors } = await client.validateLicenseKeyWithKey(key, fingerprint);
+  
+    if (validationErrors) {
+      return set(state => ({ ...state, errors: validationErrors }));
+    }
+  
+    set(state => ({ ...state, validation: meta, license: data }));
+  
+    // List machines for the license if it exists (regardless of validity)
+    if (data != null) {
+      listMachinesForLicense();
+    }
+  },  
 
   deactivateMachineForLicense: async id => {
     const { license, validateLicenseKeyWithKey, listMachinesForLicense } = get();
@@ -275,9 +303,25 @@ const LicenseInfo = ({ showSeats = true }) => {
                   </td>
                 : null}
               <td>
-                {validation?.valid
-                ? <code>{validation?.code}</code>
-                : <button className='demo-component__button demo-component__button--renew-key' type='button' onClick={handleRenewClick}>Renew</button>}
+                {(() => {
+                  switch (true) {
+                    case validation?.valid:
+                      return <code>{validation?.code}</code>;
+
+                    case validation?.code === 'FINGERPRINT_SCOPE_REQUIRED':
+                      return <code>FINGERPRINT_SCOPE_REQUIRED (No machines found)</code>;
+                    default:
+                      return (
+                        <>
+                          <code>{validation?.code}</code>
+                          <span style={{ marginLeft: '5px' }}></span>
+                          <button className='demo-component__button demo-component__button--renew-key' type='button' onClick={handleRenewClick}>
+                            Renew
+                          </button>
+                        </>
+                      );
+                  }
+                })()}
               </td>
               <td>
                 <button className='demo-component__button demo-component__button--logout' type='button' onClick={reset}>

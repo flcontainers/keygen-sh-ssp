@@ -18,28 +18,26 @@ if [ "$CLOUDFLARE" = "1" ]; then
     # Backup the original NGINX configuration file
     cp $NGINX_CONF "${NGINX_CONF}.backup"
 
-    # Remove existing Cloudflare IPs in default.conf (optional)
-    sed -i '/set_real_ip_from/d' $NGINX_CONF
-    sed -i '/real_ip_header CF-Connecting-IP;/d' $NGINX_CONF
-    sed -i '/real_ip_recursive on;/d' $NGINX_CONF
+    # Remove existing Cloudflare IP block (between markers)
+    sed -i '/# Cloudflare IPs start/,/# Cloudflare IPs end/d' $NGINX_CONF
 
-    # Create a temporary file to hold the new configuration content
+    # Create a temporary file to hold the new Cloudflare IPs configuration
     TEMP_FILE=$(mktemp /tmp/cloudflare.XXXXXX)
 
     # Add the Cloudflare IPs to the temporary file with proper indentation
-    echo "    # Cloudflare IPs" > $TEMP_FILE
+    echo "    # Cloudflare IPs start" > $TEMP_FILE
     for ip in $CF_IPV4; do
         echo "    set_real_ip_from $ip;" >> $TEMP_FILE
     done
     for ip in $CF_IPV6; do
         echo "    set_real_ip_from $ip;" >> $TEMP_FILE
     done
+    echo "    # Cloudflare IPs end" >> $TEMP_FILE
 
-    # Add the real_ip_header and real_ip_recursive directives with proper indentation
-    echo "    real_ip_header CF-Connecting-IP;" >> $TEMP_FILE
-    echo "    real_ip_recursive on;" >> $TEMP_FILE
+    # Replace the real_ip_header with the Cloudflare header
+    sed -i 's/real_ip_header X-Forwarded-For;/real_ip_header CF-Connecting-IP;/' $NGINX_CONF
 
-    # Insert the content of the temporary file after the line containing "#Cloudflare"
+    # Insert the Cloudflare IPs after the #Cloudflare comment
     sed -i "/#Cloudflare/ r $TEMP_FILE" $NGINX_CONF
 
     # Clean up the temporary file

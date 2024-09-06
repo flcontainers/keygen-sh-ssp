@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { userEmail, userName } from './auth';
 
 /**
@@ -155,9 +155,42 @@ const useLicensingStore = createStore((set, get) => ({
   validation: null,
   license: null,
   machines: [],
+  licenses: [], // New state to store licenses
   errors: [],
 
   setKey: key => set(state => ({ ...state, key })),
+
+  // Fetch licenses from the backend
+  fetchLicenses: async () => {
+    try {
+      const response = await fetch('/api/getKeys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userEmail }),  // Pass user email in the body
+      });
+      const data = await response.json();
+
+      if (data.errors) {
+        return set(state => ({ ...state, errors: data.errors }));
+      }
+
+      // Save fetched licenses in the store
+      set(state => ({ ...state, licenses: data.licenses }));
+    } catch (error) {
+      set(state => ({
+        ...state,
+        errors: [{ title: 'Fetch error', detail: 'Failed to fetch licenses.' }],
+      }));
+    }
+  },
+
+  // Select and validate a license key
+  selectLicenseKey: async (key) => {
+    const { validateLicenseKeyWithKey, setKey } = get();
+    
+    setKey(key); // Set the key to the selected one
+    await validateLicenseKeyWithKey(); // Trigger validation process for the selected key
+  },
 
   validateLicenseKeyWithKey: async () => {
     const { key, listMachinesForLicense } = get();
@@ -175,7 +208,7 @@ const useLicensingStore = createStore((set, get) => ({
       }
       
       // Log or handle the "Machine not found" error if needed
-      console.warn('Machine not found error occurred, continuing...');
+      console.log('Key Info: No machines allocated to key...');
     }
   
     // Step 2: Update the store with the fingerprint (if available)
@@ -267,12 +300,15 @@ const LicenseInfo = ({ showSeats = true }) => {
     window.location.href = mailtoUrl;
   };
 
+  // Determine validation status
+  const isValid = validation?.valid || (license?.attributes?.status === 'ACTIVE' && validation?.code === 'FINGERPRINT_SCOPE_REQUIRED');
+
   return (
     <div className='demo-component'>
       <h2>
         <small>{license?.attributes?.name ?? 'License key'}</small>
         {license?.attributes?.key ?? 'N/A'}
-        {validation?.valid
+        {isValid
          ? <span className='demo-component__tag demo-component__tag--valid'>Valid</span>
          : <span className='demo-component__tag demo-component__tag--invalid'>Invalid</span>}
       </h2>
@@ -336,16 +372,15 @@ const LicenseInfo = ({ showSeats = true }) => {
   );
 };
 
-const DeviceActivationInput = ({ name, platform, browser, version, fingerprint, onSubmit }) => {
+const DeviceActivationInput = ({ name, platform, version, fingerprint, onSubmit }) => {
   return (
-    <form onSubmit={e => (e.preventDefault(), onSubmit({ name, platform, browser, version }))}>
+    <form onSubmit={e => (e.preventDefault(), onSubmit({ name, platform, version }))}>
       <div className='demo-component__table'>
         <table>
           <thead>
             <tr>
               <th>Device Name</th>
               <th>Fingerprint</th>
-              <th>Browser</th>
               <th>Version</th>
               <th></th>
             </tr>
@@ -357,9 +392,6 @@ const DeviceActivationInput = ({ name, platform, browser, version, fingerprint, 
               </td>
               <td>
                 <code>{fingerprint}</code>
-              </td>
-              <td>
-                {browser}
               </td>
               <td>
                 {version}
@@ -484,64 +516,116 @@ const LicenseManager = () => {
   );
 };
 
-const LicenseKeyInput = ({ keyValue, onKeyChange, onSubmit }) => {
-  return (
-    <form onSubmit={e => (e.preventDefault(), onSubmit())}>
-      <input
-        type='text'
-        placeholder='XXXXXX-XXXXXX-XXXXXX-XXXXXX-XXXXXX-V3'
-        value={keyValue ?? ''}
-        onChange={e => onKeyChange(e.target.value)}
-        required={true}
-      />
-      <button type='submit'>
-        Continue
-      </button>
-    </form>
-  );
-};
-
-const LicenseValidator = () => {
-  const { key, validateLicenseKeyWithKey, setKey } = useLicensingStore();
-  const validateLicenseKeyAction = validateLicenseKeyWithKey;
-
-  return (
-    <div className='demo-component'>
-      <h2>
-        <small>Activation Status</small>
-      </h2>
-      <p>Please enter a license key and fingerprint</p>
-      <LicenseKeyInput
-        keyValue={key}
-        onKeyChange={setKey}
-        onSubmit={validateLicenseKeyAction}
-      />
-    </div>
-  );
-};
-
 const LicenseActivationPortal = () => {
-  const { license, validation, errors } = useLicensingStore();
+  const {
+    key, // Current key in the store
+    setKey, // Function to update the key in the store
+    licenses, // List of licenses
+    fetchLicenses, // Function to fetch licenses
+    validateLicenseKeyWithKey, // Validation function
+    errors, // Any errors from fetching or validating
+    license, // Validated license data
+    validation, // License validation status
+  } = useLicensingStore();
+
+  // Fetch licenses when the component mounts
+  useEffect(() => {
+    fetchLicenses();
+  }, [fetchLicenses]);
+
+  // Handle license selection
+  const handleLicenseSelect = (selectedKey) => {
+    console.log('Selected key:', selectedKey); // Debugging
+    setKey(selectedKey); // Set the selected key in the store
+    validateLicenseKeyWithKey(); // Trigger validation process after selecting the key
+  };
+
+  const handleRequestLicense = () => {
+    const recipient = process.env.REQUEST_EMAIL;
+    const subject = 'Request new license';
+    const body = `Hi License team,\n\nI would like to request a new license.\n-- Account information --\nEmail: ${userEmail}\nUsername: ${userName}\n\n-- Personal Details --\nSurname: *\nName: *\nReason for request:\n(Text here *)\n\n\nThank you\n\n${userName}`;
+
+    const mailtoLink = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.location.href = mailtoLink;
+  };
 
   if (errors?.length) {
     return (
       <div className='demo' data-title='Activation Status'>
         <LicenseErrors />
-        {errors.some(e => e.code === 'MACHINE_LIMIT_EXCEEDED')
-          ? <LicenseManager />
-          : null}
+      </div>
+    );
+  }
+
+  // If there is a validated license, show the license info and machines
+  if (license && validation?.valid) {
+    return (
+      <div className='demo' data-title='Activation Status'>
+        <LicenseInfo />
+        <LicenseManager />
       </div>
     );
   }
 
   if (license == null && validation == null) {
-    return (
-      <div className='demo' data-title='Activation Status'>
-        <LicenseValidator />
+  // Show the license selection if no license has been validated yet
+  return (
+    <div className='demo' data-title='Available Licenses'>
+      <div className='demo-component'>
+        <h2>
+          <small>Available Licenses</small>
+        </h2>
+        {licenses.length > 0 ? (
+          <div className='demo-component__table'>
+            <table>
+              <thead>
+                <tr>
+                  <th>License Name</th>
+                  <th>License Key</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {licenses.map((license) => (
+                  <React.Fragment key={license.key}>
+                    <tr>
+                      <td>{license.name}</td>
+                      <td><code>{license.key}</code></td>
+                      <td>
+                        <button
+                          className='demo-component__button demo-component__button--key-select'
+                          onClick={() => handleLicenseSelect(license.key)}
+                        >
+                          Select
+                        </button>
+                      </td>
+                    </tr>
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div>No licenses available</div>
+        )}
       </div>
-    );
+      <div className='demo-component'>
+        <h2>
+          <small>New Key Request</small>
+        </h2>
+        <button className='demo-component__button demo-component__button--new-key' type='button' onClick={handleRequestLicense}>Request License</button>
+        <p>
+          <small>
+            <span>Note:</span><br />
+            <code>As part of the request and activation process, the following mandatory information will be stored:</code><br />
+            <code>Name, Surname, Email, IP, Machine Name, Machine fingerprint</code>
+          </small>
+        </p>
+      </div>
+    </div>
+  );
   }
-
+  
   if (validation?.valid) {
     return (
       <div className='demo' data-title='Activation Status'>
@@ -568,6 +652,7 @@ const LicenseActivationPortal = () => {
         </div>
       );
   }
+
 };
 
 export default LicenseActivationPortal;

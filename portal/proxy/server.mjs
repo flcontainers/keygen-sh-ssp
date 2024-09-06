@@ -1,6 +1,3 @@
-//const express = require ('express');
-//const cors = require('cors');
-//const dotenv = require('dotenv');
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -78,6 +75,7 @@ app.use((err, req, res, next) => {
 
 app.post('/validateLicense', (req, res) => {
   const { key, userEmail } = req.body;
+  console.log('[Backend] Path: /validateLicense, Checked Email:', userEmail);
 
   fetch(`${KEYGEN_URL}/v1/accounts/${KEYGEN_ACCOUNT_ID}/licenses?user=${userEmail}`, {
     method: 'GET',
@@ -91,6 +89,7 @@ app.post('/validateLicense', (req, res) => {
         res.status(404).json({
           errors: [{ title: 'License check error', detail: 'There was an issue checking the machine id.' }],
         });
+        console.log('[Backend] There was an issue checking the machine id.');
         return null; // Break the chain
       }
       return resLicenses.json();
@@ -110,6 +109,7 @@ app.post('/validateLicense', (req, res) => {
         res.json({
           errors: [{ title: 'License not found', detail: 'The provided license key does not belong to the current user or does not exist.' }],
         });
+        console.log('[Backend] License not found.');
         return null; // Break the chain
       }
 
@@ -128,6 +128,7 @@ app.post('/validateLicense', (req, res) => {
         res.json({
           errors: [{ title: 'License check error', detail: 'There was an issue checking the machine id.' }],
         });
+        console.log('[Backend] There was an issue checking the machine id.');
         return null; // Break the chain
       }
       return machineResponse.json();
@@ -145,12 +146,13 @@ app.post('/validateLicense', (req, res) => {
         res.json({
           errors: [{ title: 'Machine not found', detail: 'No machines found associated with the provided license key.' }],
         });
+        console.log('[Backend] No machines found associated with the provided license key.');
         return null; // Break the chain
       }
 
       // Extract the fingerprint from the first matching machine
       const { attributes: { fingerprint } } = machinesData[0];
-
+      console.log('[Backend] Return OK');
       res.json({ fingerprint });
     })
     .catch(error => {
@@ -158,6 +160,56 @@ app.post('/validateLicense', (req, res) => {
       res.status(500).json({
         errors: [{ title: 'Server Error', detail: error.message }],
       });
+      console.log('[Backend] Server Error');
+    });
+});
+
+app.post('/getKeys', (req, res) => {
+  const { userEmail } = req.body;
+  console.log('[Backend] Path: /getKeys, Checked Email:', userEmail);
+
+  fetch(`${KEYGEN_URL}/v1/accounts/${KEYGEN_ACCOUNT_ID}/licenses?user=${userEmail}`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${KEYGEN_TOKEN}`,
+      'Accept': 'application/vnd.api+json',
+    },
+  })
+    .then(response => {
+      if (!response.ok) {
+        res.status(404).json({
+          errors: [{ title: 'License check error', detail: 'There was an error in network response.' }],
+        });
+        console.log('[Backend] There was an error in network response.');
+        return null; // Break the chain
+      }
+      return response.json();
+    })
+    .then(data => {
+      if (!data || !data.data || data.data.length === 0) {
+        res.status(404).json({
+          errors: [{ title: 'No Licenses Found', detail: 'This account does not exist or has no licenses.' }],
+        });
+        console.log('[Backend] This account does not exist or has no licenses.');
+        return null; // Break the chain
+      }
+      const licenses = [];
+
+      // Extract name and key from each license object
+      data.data.forEach(license => {
+        licenses.push({
+          name: license.attributes.name,
+          key: license.attributes.key,
+        });
+      });
+      console.log('[Backend] Return OK');
+      res.json({ licenses });
+    })
+    .catch(error => {
+      res.status(500).json({
+        errors: [{ title: 'Server Error', detail: error.message }],
+      });
+      console.log('[Backend] Server Error');
     });
 });
 

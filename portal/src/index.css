@@ -84,9 +84,14 @@ body {
   border: lightsalmon;
 }
 
+.demo-component button.demo-component__button--key-select {
+  background: green;
+  border: green;
+}
+
 .demo-component button.demo-component__button--new-key {
-  background: orange;
-  border: orange;
+  background: darkorange;
+  border: darkorange;
 }
 
 .demo-component code,

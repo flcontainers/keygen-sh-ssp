@@ -1,4 +1,4 @@
-import Keycloak from 'keycloak-js';
+import Keycloak from '../node_modules/keycloak-js/lib/keycloak.js';
 
 let initOptions = {
   url: process.env.KEYCLOAK_URL,

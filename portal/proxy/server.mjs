@@ -168,7 +168,7 @@ app.post('/getKeys', (req, res) => {
   const { userEmail } = req.body;
   console.log('[Backend] Path: /getKeys, Checked Email:', userEmail);
 
-  fetch(`${KEYGEN_URL}/v1/accounts/${KEYGEN_ACCOUNT_ID}/licenses?limit=100user=${userEmail}`, {
+  fetch(`${KEYGEN_URL}/v1/accounts/${KEYGEN_ACCOUNT_ID}/licenses?limit=100&user=${userEmail}`, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${KEYGEN_TOKEN}`,

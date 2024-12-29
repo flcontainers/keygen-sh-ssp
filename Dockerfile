@@ -25,13 +25,34 @@ ENV NODE_ENV=production
 # node app directory
 RUN mkdir -p /app/node
 
-# Install yarn
-RUN apk add --no-cache yarn
+# Install required packages
+RUN apk add --no-cache yarn netcat-openbsd
 
 # Build Portal
 WORKDIR /app/node
 COPY app/ .
-RUN yarn build
+
+# Production build with error logging
+RUN yarn install --production \
+    && yarn cache clean
+
+# Add healthcheck with proper logging
+HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
+    CMD nc -z localhost 3000 || (echo "Health check failed" && exit 1)
+
+# Add startup script with error handling first
+COPY docker-entrypoint.sh /
+RUN chmod +x /docker-entrypoint.sh
+
+# Create non-root user and set permissions after chmod
+RUN adduser -D nodeuser && \
+    chown -R nodeuser:nodeuser /app/node && \
+    chown nodeuser:nodeuser /docker-entrypoint.sh
+
+# Switch to non-root user
+USER nodeuser
 
 EXPOSE 3000
+
+ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["yarn", "start"]

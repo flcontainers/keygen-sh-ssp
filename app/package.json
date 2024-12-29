@@ -11,8 +11,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "yarn",
-    "prestart": "yarn build",
+    "build": "yarn install",
     "start": "node ./index.js"
   },
   "dependencies": {

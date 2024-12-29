@@ -1,13 +1,12 @@
 # Base image for Node.js applications
-ARG NODE_BASE_IMAGE=stable-alpine
-FROM nginx:${NODE_BASE_IMAGE}
+FROM node:lts-alpine
 
 ARG APPLICATION="keygen-sh-ssp"
-ARG BUILD_RFC3339="2024-08-30T20:00:00Z"
+ARG BUILD_RFC3339="2024-12-29T16:00:00Z"
 ARG REVISION="local"
 ARG DESCRIPTION="Fully Packaged Self-Service Portal for Keygen.sh with keycloak SSO"
 ARG PACKAGE="flcontainers/keygen-sh-ssp"
-ARG VERSION="0.1.0"
+ARG VERSION="1.0.0"
 
 LABEL org.opencontainers.image.ref.name="${PACKAGE}" \
   org.opencontainers.image.created=$BUILD_RFC3339 \
@@ -24,30 +23,15 @@ LABEL org.opencontainers.image.ref.name="${PACKAGE}" \
 ENV NODE_ENV=production
 
 # node app directory
-RUN mkdir -p /app/node/portal
+RUN mkdir -p /app/node
 
-# Install nginx
-RUN apk add --no-cache nodejs yarn
+# Install yarn
+RUN apk add --no-cache yarn
 
 # Build Portal
-WORKDIR /app/node/portal
-COPY portal/ .
-RUN yarn
+WORKDIR /app/node
+COPY app/ .
+RUN yarn build
 
-# Change rights
-#RUN chown www-data:www-data -R /app/node
-
-# Copy Nginx configuration file
-COPY nginx/proxy.conf /etc/nginx/conf.d/default.conf
-
-# Copy a custom startup script
-COPY script/startup.sh /startup.sh
-COPY script/cloudflare_nginx.sh /cloudflare_nginx.sh
-RUN chmod +x /*.sh
-
-
-WORKDIR /app/node/portal
-#USER www-data
-
-EXPOSE 80
-CMD ["/startup.sh"]
+EXPOSE 3000
+CMD ["yarn", "start"]

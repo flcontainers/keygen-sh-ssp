@@ -1,0 +1,513 @@
+/* Theme variables */
+:root {
+    /* Light theme */
+    --bg-primary: #f5f7fb;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #f8f9fa;
+    --text-primary: #333;
+    --text-secondary: #505050;
+    --border-color: rgba(0, 0, 0, 0.1);
+    --card-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    --accent-color: #3498db;
+    --accent-hover: #2980b9;
+    --admin-accent: #e74c3c;
+}
+
+/* Dark theme */
+[data-theme="dark"] {
+    --bg-primary: #1a1a1a;
+    --bg-secondary: #2d2d2d;
+    --bg-tertiary: #333333;
+    --text-primary: #ffffff;
+    --text-secondary: #cccccc;
+    --border-color: rgba(255, 255, 255, 0.1);
+    --card-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    --accent-color: #4fa3e0;
+    --accent-hover: #2980b9;
+    --admin-accent: #e74c3c;
+}
+
+/* Reset and base styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.6;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+/* Theme toggle */
+.theme-toggle-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+}
+
+.theme-toggle-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 20px;
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    cursor: pointer;
+    box-shadow: var(--card-shadow);
+    transition: all 0.3s ease;
+}
+
+.theme-toggle-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px var(--border-color);
+}
+
+/* Container */
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* Header styles */
+header {
+    background-color: var(--bg-secondary);
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: var(--card-shadow);
+    margin-bottom: 30px;
+}
+
+header h1 {
+    color: var(--text-primary);
+    font-size: 2em;
+}
+
+/* Header content */
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#admin-button-container {
+    text-align: right;
+}
+
+.switch-view-btn {
+    margin-left: auto;
+    font-size: 1em;
+    font-weight: bold;
+    padding: 10px 20px;
+    border-radius: 4px;
+    transition: background-color 0.3s ease;
+}
+
+.user-info, .admin-info {
+    background-color: var(--bg-tertiary);
+    padding: 15px;
+    margin-top: 10px;
+    border-radius: 8px;
+    border-left: 4px solid var(--accent-color);
+}
+
+.user-info p, .admin-info p {
+    margin: 5px 0;
+    color: var(--text-secondary);
+}
+
+/* Main content area */
+main {
+    padding: 20px;
+}
+
+.dashboard-content, .user-content {
+    background-color: var(--bg-secondary);
+    border-radius: 10px;
+    box-shadow: var(--card-shadow);
+    padding: 20px;
+}
+
+.dashboard-content h2 {
+    color: var(--text-primary);
+    margin-bottom: 20px;
+    font-size: 1.5em;
+}
+
+/* User Info Block */
+.user-info-block {
+    margin-bottom: 20px;
+    padding: 20px; /* Add padding here */
+}
+
+/* Licenses Info Block */
+.licenses-info-block {
+    margin-bottom: 20px;
+}
+
+/* Modal styles */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.5);
+    padding-top: 60px;
+}
+
+.modal-content {
+    background-color: var(--bg-secondary);
+    margin: 5% auto;
+    padding: 20px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    width: 80%;
+    max-width: 600px;
+    box-shadow: var(--card-shadow);
+}
+
+.close-modal {
+    color: var(--admin-accent);
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+}
+
+.close-modal:hover,
+.close-modal:focus {
+    color: var(--accent-hover);
+    text-decoration: none;
+    cursor: pointer;
+}
+
+/* Search and Create Bar */
+.search-create-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.create-license-btn {
+    background-color: #2ecc71;
+    color: white;
+}
+
+.create-license-btn:hover {
+    background-color: #27ae60;
+}
+
+/* Form styles */
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: var(--text-primary);
+}
+
+.form-group input[type="text"],
+.form-group select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 1em;
+    transition: border-color 0.3s ease;
+}
+
+.form-group input[type="text"]:focus,
+.form-group select:focus {
+    border-color: var(--accent-color);
+    outline: none;
+}
+
+.form-group button {
+    width: 100%;
+    padding: 15px;
+    border: none;
+    border-radius: 4px;
+    background-color: var(--accent-color);
+    color: white;
+    font-size: 1em;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.form-group button:hover {
+    background-color: var(--accent-hover);
+}
+
+/* Dropdown styles */
+.form-group select {
+    overflow-y: auto;
+}
+
+/* Search Input */
+.search-input {
+    width:50%;
+    padding: 15px;
+    margin: 20px 0;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 1em;
+    transition: border-color 0.3s ease;
+}
+
+.search-input:focus {
+    border-color: var(--accent-color);
+    outline: none;
+}
+
+/* License Table */
+.licenses-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    display: table; /* Ensure the table displays correctly */
+}
+
+.licenses-table th, .licenses-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.licenses-table th {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-weight: bold;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.licenses-table td {
+    background-color: var(--bg-secondary);
+    color: var(--text-secondary);
+}
+
+.licenses-table th:nth-child(1), .licenses-table td:nth-child(1) {
+    width: 30%;
+}
+
+.licenses-table th:nth-child(2), .licenses-table td:nth-child(2) {
+    width: 50%;
+}
+
+.licenses-table th:nth-child(3), .licenses-table td:nth-child(3) {
+    width: 20%;
+    text-align: center;
+}
+
+.table-container {
+    max-height: 680px;
+    overflow-y: auto;
+}
+
+.licenses-table thead {
+    position: sticky;
+    top: 0;
+    background: var(--background-color);
+    z-index: 1;
+}
+
+.licenses-table tbody {
+    border-top: 1px solid var(--border-color);
+}
+
+/* License Details Block */
+.license-details-block {
+    border: 2px solid var(--bg-tertiary);
+    padding: 15px;
+    border-radius: 8px;
+    margin-top: 20px;
+}
+
+.license-details-block.active {
+    border-color: green; /* Green border for ACTIVE */
+}
+
+.license-details-block.inactive {
+    border-color: grey; /* Grey border for INACTIVE */
+}
+
+.license-details-block.other {
+    border-color: red; /* Red border for any other status */
+}
+
+.license-details-content {
+    margin-top: 10px;
+}
+
+.license-details-content p {
+    margin: 10px 0;
+    color: var(--text-secondary);
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.status-badge.active {
+    background-color: #2ecc71;
+    color: white;
+}
+
+.status-badge.inactive {
+    background-color: #95a5a6;
+    color: white;
+}
+
+.status-badge.other {
+    background-color: #e74c3c;
+    color: white;
+}
+
+/* Machines Info Block */
+.machines-content {
+    background-color: var(--bg-tertiary);
+    margin-top: 20px;
+    padding: 0; /* Remove padding here */
+    border-radius: 8px;
+}
+
+.machines-info-block {
+    margin-top: 20px;
+    padding: 0; /* Remove padding here */
+}
+
+.machines-list-block {
+    margin-top: 20px;
+}
+
+.machines-container {
+    padding: 40px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.machines-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.machines-table th, .machines-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.machines-table th {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-weight: bold;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.machines-table td {
+    background-color: var(--bg-secondary);
+    color: var(--text-secondary);
+}
+
+.machines-table td:nth-child(1) {
+    width: 15%;
+}
+
+.machines-table td:nth-child(2) {
+    width: 15%;
+}
+
+.machines-table td:nth-child(3) {
+    width: 15%;
+}
+
+.machines-table td:nth-child(4) {
+    width: 40%;
+}
+
+.machines-table td:nth-child(5) {
+    width: 15%;
+    text-align: center;
+}
+
+/* Buttons */
+.btn {
+    display: inline-block;
+    padding: 10px 20px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    text-decoration: none;
+}
+
+.btn-primary {
+    background-color: var(--accent-color);
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: var(--accent-hover);
+}
+
+.btn-danger {
+    background-color: var(--admin-accent);
+    color: white;
+}
+
+.btn-danger:hover {
+    background-color: #c0392b;
+}
+
+.btn.btn-danger {
+    background-color: #dc3545;
+    border-color: #dc3545;
+    color: white;
+}
+
+.btn.btn-danger:hover {
+    background-color: #c82333;
+    border-color: #bd2130;
+}
+
+/* Loading and Error States */
+.loading, .error-message, .no-licenses, .no-machines {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-secondary);
+    grid-column: 1 / -1;
+}
+
+.error-message {
+    color: #e74c3c;
+}
+
+.no-machines {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-secondary);
+    grid-column: 1 / -1;
+}

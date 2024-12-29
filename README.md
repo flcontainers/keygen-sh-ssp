@@ -8,6 +8,7 @@ The portal offers the following functionality:
 - License information e.g. expiration date.
 - Machine deactivation.
 - Protection behind SSO Portal
+- Admin portal
 - Env variables
 
 ## Env Variables
@@ -15,6 +16,7 @@ _Note: Mandatory varibales marked with *_
 
 __Keycloak data:__
 - KEYCLOAK_ID * (Client ID. Note: client must be public)
+- KEYCLOAK_SECRET * (Client secret)
 - KEYCLOAK_REALM * (Realm name)
 - KEYCLOAK_URL * (URL of the server) / e.g. https://kc.myserver.org/
 
@@ -25,7 +27,6 @@ __Keygen data:__
 
 __Other data:__
 - DOMAIN * (domain of the ssp portal) / e.g. my-domain.com:port (port if required)
-- REQUEST_EMAIL (Support Email for license request)
-- CLOUDFLARE (0 or 1 to use real IP from cloudflare)
+- SESSION * (Session secret for your portal)
 
 Note: You can use a local .env at root of the application or container variables...

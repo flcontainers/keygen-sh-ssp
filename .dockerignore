@@ -1,6 +1,5 @@
 #Ignore npm files
 **/.env
-**/.parcel-cache/*
 **.lock
 **/dist/*
 **/node_modules/*

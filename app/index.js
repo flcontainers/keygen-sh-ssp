@@ -3,6 +3,7 @@ const express = require('express');
 const session = require('express-session');
 const Keycloak = require('keycloak-connect');
 const path = require('path');
+const SQLiteStore = require('connect-sqlite3')(session);
 
 const app = express();
 
@@ -13,19 +14,24 @@ app.set('trust proxy', 1);
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-// Session setup for Keycloak
-const memoryStore = new session.MemoryStore();
+// Create store instance to be shared
+const store = new SQLiteStore({
+  dir: './sessions', // Directory where SQLite db will be saved
+  db: 'sessions.db', // Database filename
+  table: 'sessions', // Table name to use
+});
 
+// Session setup for Keycloak
 app.use(
   session({
+    store: store,
     secret: process.env.SESSION,
     resave: false,
     saveUninitialized: true,
-    store: memoryStore,
     cookie: {
       maxAge: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
-      //secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
-      //sameSite: 'strict'
+      secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
+      sameSite: 'strict'
     },
     rolling: true // Resets the cookie expiration on every response
   })
@@ -46,7 +52,8 @@ const keycloakConfig = {
   "confidential-port": 0
 };
 
-const keycloak = new Keycloak({ store: memoryStore }, keycloakConfig);
+// Initialize Keycloak with store
+const keycloak = new Keycloak({ store: store }, keycloakConfig);
 app.use(keycloak.middleware());
 
 // Middleware to check client role

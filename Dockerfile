@@ -24,9 +24,10 @@ ENV NODE_ENV=production
 
 # node app directory
 RUN mkdir -p /app/node
+RUN mkdir -p /app/node/sessions
 
 # Install required packages
-RUN apk add --no-cache yarn netcat-openbsd
+RUN apk add --no-cache yarn netcat-openbsd sqlite sqlite-dev
 
 # Build Portal
 WORKDIR /app/node
@@ -47,7 +48,8 @@ RUN chmod +x /docker-entrypoint.sh
 # Create non-root user and set permissions after chmod
 RUN adduser -D nodeuser && \
     chown -R nodeuser:nodeuser /app/node && \
-    chown nodeuser:nodeuser /docker-entrypoint.sh
+    chown nodeuser:nodeuser /docker-entrypoint.sh && \
+    chown -R nodeuser:nodeuser /app/node/sessions
 
 # Switch to non-root user
 USER nodeuser

@@ -6,6 +6,9 @@ const path = require('path');
 
 const app = express();
 
+// If behind a proxy, trust the proxy headers
+app.set('trust proxy', 1);
+
 // Set up EJS as the view engine
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
@@ -19,6 +22,12 @@ app.use(
     resave: false,
     saveUninitialized: true,
     store: memoryStore,
+    cookie: {
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
+      secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
+      sameSite: 'strict'
+    },
+    rolling: true // Resets the cookie expiration on every response
   })
 );
 

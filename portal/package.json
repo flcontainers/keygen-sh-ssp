@@ -1,6 +1,6 @@
 {
   "name": "keygen-sh-ssp",
-  "version": "0.3.2",
+  "version": "0.3.4",
   "description": "Fully Packaged Self-Service Portal for Keygen.sh with keycloak SSO",
   "keywords": [
     "keygen.sh",
@@ -13,7 +13,7 @@
   "private": true,
   "browserslist": "last 2 versions, not dead",
   "engines": {
-    "node": "^20"
+    "node": ">=20"
   },
   "scripts": {
     "prebuild": "rimraf ./dist",

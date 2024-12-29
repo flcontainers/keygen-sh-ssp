@@ -10,6 +10,16 @@ const app = express();
 // If behind a proxy, trust the proxy headers
 app.set('trust proxy', 1);
 
+// Force HTTPS in production
+if (process.env.NODE_ENV === 'production') {
+  app.use((req, res, next) => {
+    if (!req.secure) {
+      return res.redirect(301, `https://${req.headers.host}${req.url}`);
+    }
+    next();
+  });
+}
+
 // Set up EJS as the view engine
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
@@ -53,7 +63,11 @@ const keycloakConfig = {
 };
 
 // Initialize Keycloak with store
-const keycloak = new Keycloak({ store: store }, keycloakConfig);
+const keycloak = new Keycloak({ 
+  store: store,
+  clearExpired: true,      // Add this option
+  checkInterval: 300       // Check every 5 minutes
+}, keycloakConfig);
 app.use(keycloak.middleware());
 
 // Middleware to check client role

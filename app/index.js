@@ -7,29 +7,40 @@ const SQLiteStore = require('connect-sqlite3')(session);
 
 const app = express();
 
-// If behind a proxy, trust the proxy headers
-app.set('trust proxy', 1);
-
-// Force HTTPS in production
+// Set trust proxy for production environment 
 if (process.env.NODE_ENV === 'production') {
+  // Enable trust proxy in production
+  app.set('trust proxy', true);
+  
+  // Force HTTPS in production
   app.use((req, res, next) => {
     if (!req.secure) {
       return res.redirect(301, `https://${req.headers.host}${req.url}`);
     }
     next();
   });
+} else {
+  // Default trust proxy setting for development
+  app.set('trust proxy', false);
 }
 
 // Set up EJS as the view engine
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-// Create store instance to be shared
-const store = new SQLiteStore({
-  dir: './sessions', // Directory where SQLite db will be saved
-  db: 'sessions.db', // Database filename
-  table: 'sessions', // Table name to use
-});
+// Create store based on environment
+let store;
+if (process.env.NODE_ENV === 'production') {
+  store = new SQLiteStore({
+    dir: './sessions', // Directory where SQLite db will be saved
+    db: 'sessions.db', // Database filename
+    table: 'sessions', // Table name to use
+  });
+  console.log('Using SQLite session store for production');
+} else {
+  store = new session.MemoryStore();
+  console.log('Using Memory session store for development');
+}
 
 // Session setup for Keycloak
 app.use(

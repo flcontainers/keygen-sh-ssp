@@ -21,17 +21,27 @@
         <main>
             <!-- Block One: User Information -->
             <section class="user-content user-info-block">
-                <h2>User Information</h2>
-                <div class="admin-info">
-                    <p>Admin Username: <%= user.username %></p>
-                    <p>Admin Email: <%= user.email %></p>
-                    <p>Client Roles:
-                        <% if (user.roles && user.roles.length > 0) { %>
-                            <span class="role-badge admin"><%= user.roles.join(', ') %></span>
-                        <% } else { %>
-                            <span class="role-badge">No specific roles assigned</span>
-                        <% } %>
-                    </p>
+                <div class="section">
+                    <div class="section-header">
+                        <h2>User Information</h2>
+                        <div class="button-group">
+                            <button onclick="openCreateUserModal()" class="btn btn-primary mr-2">Create User</button>
+                            <button onclick="openDeleteUserModal()" class="btn btn-danger">Delete User</button>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <div class="admin-info">
+                            <p>Admin Username: <%= user.username %></p>
+                            <p>Admin Email: <%= user.email %></p>
+                            <p>Client Roles:
+                                <% if (user.roles && user.roles.length > 0) { %>
+                                    <span class="role-badge admin"><%= user.roles.join(', ') %></span>
+                                <% } else { %>
+                                    <span class="role-badge">No specific roles assigned</span>
+                                <% } %>
+                            </p>
+                        </div>
+                    </div>
                 </div>
             </section>
             <!-- Block Two: License Information -->
@@ -41,8 +51,6 @@
                     <div class="search-create-bar">
                         <input type="text" id="license-search" class="search-input" placeholder="Search by name or key" onkeyup="filterLicenses()">
                         <div class="button-group">
-                            <button class="btn btn-danger" onclick="openDeleteUserModal()">Delete User</button>
-                            <button class="btn btn-primary" onclick="openCreateUserModal()">Create User</button>
                             <button class="btn btn-success create-license-btn" onclick="openCreateLicenseModal()">Create License</button>
                         </div>
                     </div>

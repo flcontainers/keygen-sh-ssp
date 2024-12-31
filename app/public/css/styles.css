@@ -548,3 +548,12 @@ main {
     color: var(--text-secondary);
     grid-column: 1 / -1;
 }
+
+#deleteUserModal .modal-content {
+    max-width: 400px;
+}
+
+#deleteUserModal .btn-danger {
+    width: 100%;
+    margin-top: 20px;
+}

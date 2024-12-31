@@ -218,7 +218,8 @@ async function loadPolicies() {
     }
 }
 
-async function loadUsers() {
+// Add debug logging to loadUsers function
+async function loadUsers(elementId = 'associatedUser') {
     try {
         const response = await fetch('/api/admin/users', {
             method: 'GET',
@@ -231,8 +232,14 @@ async function loadUsers() {
             throw new Error('Failed to fetch users');
         }
 
-        const data = await response.json();
-        const userSelect = document.getElementById('associatedUser');
+        const data = await response.json();        
+        const userSelect = document.getElementById(elementId);
+        if (!userSelect) {
+            console.error('Select element not found:', elementId);
+            return;
+        }
+
+        // Clear existing options
         userSelect.innerHTML = '<option value="">Select a user</option>';
 
         const usersWithCallsigns = data.users.map(user => {
@@ -495,6 +502,57 @@ function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+}
+
+function openDeleteUserModal() {
+    console.log('Opening delete user modal');
+    const modal = document.getElementById('deleteUserModal');
+    modal.style.display = 'block';
+    loadUsers('userToDelete'); // Debug - verify this call
+}
+
+function closeDeleteUserModal() {
+    document.getElementById('deleteUserModal').style.display = 'none';
+}
+
+async function deleteSelectedUser() {
+    const userSelect = document.getElementById('userToDelete');
+    const userId = userSelect.value;
+    
+    if (!userId) {
+        alert('Please select a user to delete');
+        return;
+    }
+
+    if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/admin/users/${userId}`, {
+            method: 'DELETE',
+            headers: {
+                'Accept': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to delete user');
+        }
+
+        const data = await response.json();
+        if (data.success) {
+            alert('User deleted successfully');
+            closeDeleteUserModal();
+            // Reload the users list
+            loadUsers('userToDelete');
+        } else {
+            alert('Failed to delete user');
+        }
+    } catch (error) {
+        console.error('Error deleting user:', error);
+        alert('Failed to delete user. Please try again later.');
+    }
 }
 
 document.addEventListener('DOMContentLoaded', loadLicenses);

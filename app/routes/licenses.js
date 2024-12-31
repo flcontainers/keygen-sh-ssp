@@ -631,4 +631,36 @@ router.delete('/deactivateMachine/:machineId', attachUser, async (req, res) => {
     }
 });
 
+// Delete a user (admin only)
+router.delete('/admin/users/:userId', checkAdmin, attachUser, async (req, res) => {
+    const { userId } = req.params;
+
+    try {
+        const response = await axios.delete(
+            `${process.env.KEYGEN_URL}/v1/accounts/${process.env.KEYGEN_ACCOUNT_ID}/users/${userId}`,
+            {
+                headers: {
+                    'Authorization': `Bearer ${process.env.KEYGEN_TOKEN}`,
+                    'Accept': 'application/vnd.api+json',
+                },
+            }
+        );
+
+        if (response.status !== 204) {
+            console.error('[Backend] Error deleting user:', response.status);
+            return res.status(response.status).json({
+                error: 'Failed to delete user'
+            });
+        }
+
+        res.json({ success: true });
+
+    } catch (error) {
+        console.error('[Backend] Server Error:', error);
+        res.status(500).json({
+            error: 'Internal server error'
+        });
+    }
+});
+
 module.exports = router;

@@ -41,6 +41,7 @@
                     <div class="search-create-bar">
                         <input type="text" id="license-search" class="search-input" placeholder="Search by name or key" onkeyup="filterLicenses()">
                         <div class="button-group">
+                            <button class="btn btn-danger" onclick="openDeleteUserModal()">Delete User</button>
                             <button class="btn btn-primary" onclick="openCreateUserModal()">Create User</button>
                             <button class="btn btn-success create-license-btn" onclick="openCreateLicenseModal()">Create License</button>
                         </div>
@@ -171,6 +172,20 @@
                     </div>
                     <button type="submit" class="btn btn-primary">Create</button>
                 </form>
+            </div>
+        </div>
+
+        <!-- Delete User Modal -->
+        <div id="deleteUserModal" class="modal">
+            <div class="modal-content">
+                <span class="close-modal" onclick="closeDeleteUserModal()">&times;</span>
+                <h2>Delete User</h2>
+                <div class="form-group">
+                    <select id="userToDelete" name="userToDelete" required>
+                        <option value="">Select a user</option>
+                    </select>
+                </div>
+                <button onclick="deleteSelectedUser()" class="btn btn-danger mt-3">Delete User</button>
             </div>
         </div>
 

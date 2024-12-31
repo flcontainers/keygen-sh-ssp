@@ -459,7 +459,7 @@ router.post('/admin/licenses', checkAdmin, attachUser, async (req, res) => {
         }
 
         const createdLicense = response.data;
-        console.log('Created license:', createdLicense); // Add this line for debugging
+        //console.log('Created license:', createdLicense); // Add this line for debugging
 
         res.json({ success: true, license: createdLicense });
 
@@ -470,6 +470,77 @@ router.post('/admin/licenses', checkAdmin, attachUser, async (req, res) => {
         });
     }
 });
+
+// Create a new user (admin only)
+let requestCount = 0;
+
+router.post('/admin/createuser', checkAdmin, attachUser, async (req, res) => {
+    const requestId = ++requestCount;
+ 
+    const { firstName, userName, userEmail, userpassword, userGroup } = req.body;
+ 
+    if (!firstName || !userName || !userEmail || !userpassword || !userGroup) {
+        return res.status(400).json({
+            error: 'Missing required fields'
+        });
+    }
+ 
+    const userData = {
+        data: {
+            type: 'users',
+            attributes: {
+                firstName: firstName,
+                lastName: userName,
+                email: userEmail,
+                password: userpassword,
+                role: 'user'
+            },
+            relationships: {
+                group: {
+                    data: {
+                        type: 'groups',
+                        id: userGroup
+                    }
+                }
+            }
+        }
+    };
+ 
+    console.log('[Pre-Request] Attempting user creation with data:', userData);
+ 
+    try {
+        const response = await axios.post(
+            `${process.env.KEYGEN_URL}/v1/accounts/${process.env.KEYGEN_ACCOUNT_ID}/users`,
+            userData,
+            {
+                headers: {
+                    'Authorization': `Bearer ${process.env.KEYGEN_TOKEN}`,
+                    'Accept': 'application/vnd.api+json',
+                    'Content-Type': 'application/vnd.api+json'
+                },
+                maxRedirects: 0,
+                validateStatus: null
+            }
+        );
+        
+        console.log('[Response] Status:', response.status);
+        //console.log(`[Request ${requestId}] Completed with status:`, response.status);
+ 
+        res.json({ success: true, user: response.data });
+ 
+    } catch (error) {
+        console.log(`[Request ${requestId}] Failed with error:`, error.response?.status);
+        console.error('[Error Details]', {
+            status: error.response?.status,
+            statusText: error.response?.statusText,
+            data: error.response?.data,
+            headers: error.response?.headers
+        });
+        res.status(error.response?.status || 500).json({
+            error: error.response?.data?.errors || 'Internal server error'
+        });
+    }
+ });
 
 // Fetch machines associated with a license key
 router.post('/fetchMachines', attachUser, async (req, res) => {

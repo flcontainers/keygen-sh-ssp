@@ -196,6 +196,11 @@ main {
     margin-bottom: 20px;
 }
 
+.button-group {
+    display: flex;
+    gap: 10px;
+}
+
 .create-license-btn {
     background-color: #2ecc71;
     color: white;
@@ -218,6 +223,7 @@ main {
 }
 
 .form-group input[type="text"],
+.form-group input[type="email"],
 .form-group select {
     width: 100%;
     padding: 10px;
@@ -227,6 +233,27 @@ main {
     color: var(--text-primary);
     font-size: 1em;
     transition: border-color 0.3s ease;
+}
+
+.form-group input:invalid {
+    border-color: #ff4444;
+}
+
+.form-group input:valid {
+    border-color: var(--border-color);
+}
+
+.form-group input[type="email"]:invalid {
+    border-color: #ff4444;
+}
+
+.form-group input[type="email"]:invalid:focus {
+    outline: none;
+    box-shadow: 0 0 3px #ff4444;
+}
+
+.form-group input[type="email"]:valid {
+    border-color: #00C851;
 }
 
 .form-group input[type="text"]:focus,
@@ -465,6 +492,7 @@ main {
 }
 
 .btn-primary {
+    margin-right: 10px;
     background-color: var(--accent-color);
     color: white;
 }
@@ -491,6 +519,15 @@ main {
 .btn.btn-danger:hover {
     background-color: #c82333;
     border-color: #bd2130;
+}
+
+#createUserModal .form-group input[type="password"] {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
 }
 
 /* Loading and Error States */

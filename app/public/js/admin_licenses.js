@@ -1,4 +1,21 @@
 document.addEventListener('DOMContentLoaded', function() {
+    // Check and clean URL parameters
+    cleanURLParameters();
+});
+
+function cleanURLParameters() {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('iss')) {
+        console.log('Detected iss parameter:', urlParams.get('iss'));
+        // Remove the iss parameter
+        urlParams.delete('iss');
+        // Update URL without reloading the page
+        const newURL = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '');
+        window.history.replaceState({}, '', newURL);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
     loadLicenses();
 
     // Close modal when clicking the X or outside the modal
@@ -128,9 +145,10 @@ function filterLicenses() {
     }
 }
 
+// Function to handle different modals
 function openCreateLicenseModal() {
     document.getElementById('createLicenseModal').style.display = 'block';
-    loadGroups();
+    loadGroups('associatedGroup'); // Specify element ID for license modal
     loadPolicies();
     loadUsers();
 }
@@ -139,7 +157,8 @@ function closeModal() {
     document.getElementById('createLicenseModal').style.display = 'none';
 }
 
-async function loadGroups() {
+// Modified loadGroups function that maintains compatibility
+async function loadGroups(elementId = 'associatedGroup') {
     try {
         const response = await fetch('/api/admin/groups', {
             method: 'GET',
@@ -153,7 +172,13 @@ async function loadGroups() {
         }
 
         const data = await response.json();
-        const groupSelect = document.getElementById('associatedGroup');
+        const groupSelect = document.getElementById(elementId);
+        
+        if (!groupSelect) {
+            console.error(`Element with ID ${elementId} not found`);
+            return;
+        }
+
         groupSelect.innerHTML = '<option value="">Select a group</option>';
         data.groups.forEach(group => {
             const option = document.createElement('option');
@@ -269,6 +294,91 @@ async function createLicense(event) {
     } catch (error) {
         console.error('Error creating license:', error);
         alert('Failed to create license. Please try again later.');
+    }
+}
+
+// User creation modal functions
+// User modal functions with explicit element ID
+function openCreateUserModal() {
+    document.getElementById('createUserModal').style.display = 'block';
+    loadGroups('userGroup'); // Specify element ID for user modal
+}
+
+function closeUserModal() {
+    document.getElementById('createUserModal').style.display = 'none';
+}
+
+// Add event listener for user creation form
+document.getElementById('createUserForm')?.addEventListener('submit', validateUserForm);
+
+function validateUserForm(event) {
+    event.preventDefault();
+    const form = event.target;
+    const email = document.getElementById('userEmail');
+    
+    if (!email.value.includes('@') || !email.value.includes('.')) {
+        email.setCustomValidity('Please enter a valid email address');
+        email.reportValidity();
+        return false;
+    }
+    
+    email.setCustomValidity('');
+    if (form.checkValidity()) {
+        createUser(event); // Pass form instead of event
+    }
+    
+    return false;
+}
+
+// Add password generation function
+function generatePassword(length = 18) {
+    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%&*?';
+    return Array.from(crypto.getRandomValues(new Uint32Array(length)))
+        .map((x) => chars[x % chars.length])
+        .join('');
+}
+
+// Modify createUser function
+let isSubmitting = false;
+
+async function createUser(event) {
+    event.preventDefault();
+    
+    if (isSubmitting) return;
+    isSubmitting = true;
+    
+    const userData = {
+        firstName: document.getElementById('firstName').value,
+        userName: document.getElementById('userName').value,
+        userEmail: document.getElementById('userEmail').value,
+        userpassword: generatePassword(),
+        userGroup: document.getElementById('userGroup').value
+    };
+
+    try {
+        const response = await fetch('/api/admin/createuser', {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(userData)
+        });
+
+        if (!response.ok) throw new Error('Failed to create user');
+
+        const data = await response.json();
+        if (data.success) {
+            //alert(`User created successfully\nGenerated password: ${userData.userpassword}\nPlease save this password!`);
+            alert(`User created successfully`);
+            closeUserModal();
+            event.target.reset();
+        }
+    } catch (error) {
+        console.error('Error creating user:', error);
+        alert('Failed to create user. Please try again later.');
+    } finally {
+        isSubmitting = false;
     }
 }
 

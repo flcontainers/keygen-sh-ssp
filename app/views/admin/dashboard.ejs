@@ -40,7 +40,10 @@
                     <h2>License Information</h2>
                     <div class="search-create-bar">
                         <input type="text" id="license-search" class="search-input" placeholder="Search by name or key" onkeyup="filterLicenses()">
-                        <button class="btn btn-success create-license-btn" onclick="openCreateLicenseModal()">Create License</button>
+                        <div class="button-group">
+                            <button class="btn btn-primary" onclick="openCreateUserModal()">Create User</button>
+                            <button class="btn btn-success create-license-btn" onclick="openCreateLicenseModal()">Create License</button>
+                        </div>
                     </div>
                     <div class="table-container">
                         <table id="licenses-table" class="licenses-table">
@@ -121,6 +124,50 @@
                         <select id="associatedPolicy" name="associatedPolicy" required>
                             <option value="">Select a policy</option>
                         </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Create</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Create User Modal -->
+        <div id="createUserModal" class="modal">
+            <div class="modal-content">
+                <span class="close-modal" onclick="closeUserModal()">&times;</span>
+                <h2>Create User</h2>
+                <form id="createUserForm" onsubmit="return validateUserForm(event)">
+                    <div class="form-group">
+                        <label for="userGroup">Group:</label>
+                        <select id="userGroup" name="userGroup" required>
+                            <option value="">Select a group</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="firstName">First Name (Callsign):</label>
+                        <input type="text" 
+                               id="firstName" 
+                               name="firstName" 
+                               pattern="^.+\s\(.+\)$"
+                               placeholder="First name (Callsign)"
+                               title="Format: Name (Callsign)"
+                               required>
+                    </div>
+                    <div class="form-group">
+                        <label for="userName">Name:</label>
+                        <input type="text" 
+                               id="userName" 
+                               name="userName" 
+                               placeholder="Last name"
+                               required>
+                    </div>
+                    <div class="form-group">
+                        <label for="userEmail">Email:</label>
+                        <input type="email" 
+                               id="userEmail" 
+                               name="userEmail" 
+                               placeholder="user@domain.com"
+                               title="Please enter a valid email address (example: user@domain.com)"
+                               required>
                     </div>
                     <button type="submit" class="btn btn-primary">Create</button>
                 </form>

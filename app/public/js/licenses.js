@@ -1,4 +1,7 @@
 document.addEventListener('DOMContentLoaded', function() {
+    // Check and clean URL parameters
+    cleanURLParameters();
+    // Existing initialization code
     loadLicenses();
 
     // Close modal when clicking the X or outside the modal
@@ -10,6 +13,18 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+function cleanURLParameters() {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('iss')) {
+        console.log('Detected iss parameter:', urlParams.get('iss'));
+        // Remove the iss parameter
+        urlParams.delete('iss');
+        // Update URL without reloading the page
+        const newURL = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '');
+        window.history.replaceState({}, '', newURL);
+    }
+}
 
 async function loadLicenses() {
     try {

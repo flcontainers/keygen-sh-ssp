@@ -2,8 +2,6 @@ name: Build Dev Docker Image
 
 # Controls when the workflow will run
 on:
-  schedule:
-    - cron: '0 0 * * *'
   push:
     branches: [ dev ]
   pull_request:

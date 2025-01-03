@@ -1,6 +1,7 @@
 const express = require('express');
 const axios = require('axios');
 const router = express.Router();
+const { logAdminAction } = require('../utils/logger');
 
 // Middleware to attach user information to the request
 function attachUser(req, res, next) {
@@ -13,6 +14,9 @@ function attachUser(req, res, next) {
         roles: roles
     };
     console.log('User attached to request:', req.user);
+    logAdminAction(token.email, 'USER_LOGIN_INFO', {
+        info: 'User logged in'
+    });
     next();
 }
 
@@ -26,9 +30,15 @@ function checkAdmin(req, res, next) {
 
     if (roles.includes('admin')) {
         console.log('User is admin');
+        logAdminAction(token.email, 'USER_ADMIN_CHECK', {
+            valid: true
+        });
         next();
     } else {
         console.log('User is not admin');
+        logAdminAction(token.email, 'USER_ADMIN_CHECK', {
+            valid: false
+        });
         res.status(403).json({ error: 'Forbidden: Admin access required' });
     }
 }
@@ -221,6 +231,7 @@ router.get('/licenses/:licenseId/machines', attachUser, async (req, res) => {
 // Delete a license (admin only)
 router.delete('/admin/licenses/:licenseId', checkAdmin, attachUser, async (req, res) => {
     const { licenseId } = req.params;
+    const adminEmail = req.user.email;
 
     try {
         // Delete the license
@@ -236,15 +247,27 @@ router.delete('/admin/licenses/:licenseId', checkAdmin, attachUser, async (req, 
 
         if (response.status !== 204) {
             console.error('[Backend] Error deleting license:', response.status);
+            logAdminAction(adminEmail, 'DELETE_LICENSE_FAILED', {
+                licenseId,
+                statusCode: response.status
+            });
             return res.status(response.status).json({
                 error: 'Failed to delete license'
             });
         }
 
+        logAdminAction(adminEmail, 'DELETE_LICENSE_SUCCESS', {
+            licenseId,
+            statusCode: response.status
+        });
         res.json({ success: true });
 
     } catch (error) {
         console.error('[Backend] Server Error:', error);
+        logAdminAction(adminEmail, 'DELETE_LICENSE_ERROR', {
+            licenseId,
+            error: error.message
+        });
         res.status(500).json({
             error: 'Internal server error'
         });
@@ -398,6 +421,7 @@ router.get('/admin/users', checkAdmin, attachUser, async (req, res) => {
 // Create a new license (admin only)
 router.post('/admin/licenses', checkAdmin, attachUser, async (req, res) => {
     const { name, policyId, groupId, userId } = req.body;
+    const adminEmail = req.user.email;
 
     if (!name || !policyId || !groupId || !userId) {
         return res.status(400).json({
@@ -436,7 +460,7 @@ router.post('/admin/licenses', checkAdmin, attachUser, async (req, res) => {
         }
     };
 
-    console.log('Sending license data to Keygen:', licenseData); // Add this line for debugging
+    //console.log('Sending license data to Keygen:', licenseData); // Add this line for debugging
 
     try {
         const response = await axios.post(
@@ -453,18 +477,27 @@ router.post('/admin/licenses', checkAdmin, attachUser, async (req, res) => {
 
         if (response.status !== 201) {
             console.error('[License Service] Error creating license:', response.status);
+            logAdminAction(adminEmail, 'CREATE_LICENSE_FAILED', 
+                { name, policyId, groupId, userId }
+            );
             return res.status(response.status).json({
                 error: 'Failed to create license'
             });
         }
 
         const createdLicense = response.data;
+        logAdminAction(adminEmail, 'CREATE_LICENSE_SUCCESS', 
+            { name, policyId, groupId, userId }
+        );
         //console.log('Created license:', createdLicense); // Add this line for debugging
 
         res.json({ success: true, license: createdLicense });
 
     } catch (error) {
         console.error('[License Service] Error:', error);
+        logAdminAction(adminEmail, 'CREATE_LICENSE_ERROR', 
+            { name, policyId, groupId, userId, error: error.message }
+        );
         res.status(500).json({
             error: 'Internal server error'
         });
@@ -478,6 +511,7 @@ router.post('/admin/createuser', checkAdmin, attachUser, async (req, res) => {
     const requestId = ++requestCount;
  
     const { firstName, userName, userEmail, userpassword, userGroup } = req.body;
+    const adminEmail = req.user.email;
  
     if (!firstName || !userName || !userEmail || !userpassword || !userGroup) {
         return res.status(400).json({
@@ -524,12 +558,18 @@ router.post('/admin/createuser', checkAdmin, attachUser, async (req, res) => {
         );
         
         console.log('[Response] Status:', response.status);
+        logAdminAction(adminEmail, 'CREATE_USER_SUCCESS', 
+            { firstName, userName, userEmail, userGroup }
+        );
         //console.log(`[Request ${requestId}] Completed with status:`, response.status);
  
         res.json({ success: true, user: response.data });
  
     } catch (error) {
         console.log(`[Request ${requestId}] Failed with error:`, error.response?.status);
+        logAdminAction(adminEmail, 'CREATE_USER_ERROR', 
+            { firstName, userName, userEmail, userGroup, error: error.message }
+        );
         console.error('[Error Details]', {
             status: error.response?.status,
             statusText: error.response?.statusText,
@@ -634,6 +674,7 @@ router.delete('/deactivateMachine/:machineId', attachUser, async (req, res) => {
 // Delete a user (admin only)
 router.delete('/admin/users/:userId', checkAdmin, attachUser, async (req, res) => {
     const { userId } = req.params;
+    const adminEmail = req.user.email;
 
     try {
         const response = await axios.delete(
@@ -648,12 +689,14 @@ router.delete('/admin/users/:userId', checkAdmin, attachUser, async (req, res) =
 
         if (response.status !== 204) {
             console.error('[Backend] Error deleting user:', response.status);
+            logAdminAction(adminEmail, 'DELETE_USER_FAILED', userId);
             return res.status(response.status).json({
                 error: 'Failed to delete user'
             });
         }
 
         res.json({ success: true });
+        logAdminAction(adminEmail, 'DELETE_USER_SUCCESS', userId);
 
     } catch (error) {
         console.error('[Backend] Server Error:', error);

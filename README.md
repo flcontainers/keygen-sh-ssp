@@ -26,7 +26,6 @@ __Keygen data:__
 - KEYGEN_TOKEN * (admin -bearer- token)
 
 __Other data:__
-- DOMAIN * (domain of the ssp portal) / e.g. my-domain.com:port (port if required)
 - SESSION * (Session secret for your portal)
 
 Note: You can use a local .env at root of the application or container variables...

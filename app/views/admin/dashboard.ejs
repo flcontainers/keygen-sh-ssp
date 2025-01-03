@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="theme-toggle-container">
+        <button id="theme-toggle" onclick="toggleTheme()" class="theme-toggle-btn"></button>
+    </div>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <h1>Admin Dashboard</h1>
+                <a href="/dashboard" class="btn btn-primary switch-view-btn">Switch to User View</a>
+            </div>
+        </header>
+
+        <main>
+            <!-- Block One: User Information -->
+            <section class="user-content user-info-block">
+                <div class="section">
+                    <div class="section-header">
+                        <h2>User Information</h2>
+                        <div class="button-group">
+                            <button onclick="openCreateUserModal()" class="btn btn-primary mr-2">Create User</button>
+                            <button onclick="openDeleteUserModal()" class="btn btn-danger">Delete User</button>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <div class="admin-info">
+                            <p>Admin Username: <%= user.username %></p>
+                            <p>Admin Email: <%= user.email %></p>
+                            <p>Client Roles:
+                                <% if (user.roles && user.roles.length > 0) { %>
+                                    <span class="role-badge admin"><%= user.roles.join(', ') %></span>
+                                <% } else { %>
+                                    <span class="role-badge">No specific roles assigned</span>
+                                <% } %>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <!-- Block Two: License Information -->
+            <section class="dashboard-content licenses-info-block">
+                <div class="licenses-container">
+                    <h2>License Information</h2>
+                    <div class="search-create-bar">
+                        <input type="text" id="license-search" class="search-input" placeholder="Search by name or key" onkeyup="filterLicenses()">
+                        <div class="button-group">
+                            <button class="btn btn-success create-license-btn" onclick="openCreateLicenseModal()">Create License</button>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table id="licenses-table" class="licenses-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Key</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Licenses will be loaded here -->
+                                <tr class="loading">
+                                    <td colspan="3">Loading licenses...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- License Details Block -->
+                <div id="license-details-block" class="license-details-block" style="display: none;">
+                    <h3>License Details</h3>
+                    <div id="license-details-content" class="license-details-content">
+                        <!-- License details will be loaded here -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Block Three: Machine Information -->
+            <section class="machines-content machines-info-block">
+                <div id="machines-list-block" class="machines-list-block" style="display: none;">
+                    <div id="machines-container" class="machines-container">
+                        <h2>Machines Associated with Selected License</h2>
+                        <table id="machines-table" class="machines-table">
+                            <thead>
+                                <tr>
+                                    <th>Machine ID</th>
+                                    <th>Name</th>
+                                    <th>IP Address</th>
+                                    <th>Fingerprint</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Machines will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Create License Modal -->
+        <div id="createLicenseModal" class="modal">
+            <div class="modal-content">
+                <span class="close-modal">&times;</span>
+                <h2>Create License</h2>
+                <form id="createLicenseForm">
+                    <div class="form-group">
+                        <label for="licenseName">License Name:</label>
+                        <input type="text" id="licenseName" name="licenseName" maxlength="25" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="associatedUser">Associated User:</label>
+                        <select id="associatedUser" name="associatedUser" required>
+                            <option value="">Select a user</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="associatedGroup">Associated Group:</label>
+                        <select id="associatedGroup" name="associatedGroup" required>
+                            <option value="">Select a group</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="associatedPolicy">Associated Policy:</label>
+                        <select id="associatedPolicy" name="associatedPolicy" required>
+                            <option value="">Select a policy</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Create</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Create User Modal -->
+        <div id="createUserModal" class="modal">
+            <div class="modal-content">
+                <span class="close-modal" onclick="closeUserModal()">&times;</span>
+                <h2>Create User</h2>
+                <form id="createUserForm" onsubmit="return validateUserForm(event)">
+                    <div class="form-group">
+                        <label for="userGroup">Group:</label>
+                        <select id="userGroup" name="userGroup" required>
+                            <option value="">Select a group</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="firstName">First Name (Callsign):</label>
+                        <input type="text" 
+                               id="firstName" 
+                               name="firstName" 
+                               pattern="^.+\s\(.+\)$"
+                               placeholder="First name (Callsign)"
+                               title="Format: Name (Callsign)"
+                               required>
+                    </div>
+                    <div class="form-group">
+                        <label for="userName">Name:</label>
+                        <input type="text" 
+                               id="userName" 
+                               name="userName" 
+                               placeholder="Last name"
+                               required>
+                    </div>
+                    <div class="form-group">
+                        <label for="userEmail">Email:</label>
+                        <input type="email" 
+                               id="userEmail" 
+                               name="userEmail" 
+                               placeholder="user@domain.com"
+                               title="Please enter a valid email address (example: user@domain.com)"
+                               required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Create</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Delete User Modal -->
+        <div id="deleteUserModal" class="modal">
+            <div class="modal-content">
+                <span class="close-modal" onclick="closeDeleteUserModal()">&times;</span>
+                <h2>Delete User</h2>
+                <div class="form-group">
+                    <select id="userToDelete" name="userToDelete" required>
+                        <option value="">Select a user</option>
+                    </select>
+                </div>
+                <button onclick="deleteSelectedUser()" class="btn btn-danger mt-3">Delete User</button>
+            </div>
+        </div>
+
+        <footer class="dashboard-footer">
+            <p>You are logged in as an administrator with full access rights</p>
+        </footer>
+    </div>
+    <script src="/js/themeToggle.js"></script>
+    <script src="/js/admin_licenses.js"></script>
+    <script src="/js/admin.js"></script>
+</body>
+</html>

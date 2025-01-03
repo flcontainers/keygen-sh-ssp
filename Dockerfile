@@ -1,13 +1,12 @@
 # Base image for Node.js applications
-ARG NODE_BASE_IMAGE=stable-alpine
-FROM nginx:${NODE_BASE_IMAGE}
+FROM node:lts-alpine
 
 ARG APPLICATION="keygen-sh-ssp"
-ARG BUILD_RFC3339="2024-08-30T20:00:00Z"
+ARG BUILD_RFC3339="2024-12-29T16:00:00Z"
 ARG REVISION="local"
 ARG DESCRIPTION="Fully Packaged Self-Service Portal for Keygen.sh with keycloak SSO"
 ARG PACKAGE="flcontainers/keygen-sh-ssp"
-ARG VERSION="0.1.0"
+ARG VERSION="1.0.0"
 
 LABEL org.opencontainers.image.ref.name="${PACKAGE}" \
   org.opencontainers.image.created=$BUILD_RFC3339 \
@@ -24,30 +23,38 @@ LABEL org.opencontainers.image.ref.name="${PACKAGE}" \
 ENV NODE_ENV=production
 
 # node app directory
-RUN mkdir -p /app/node/portal
+RUN mkdir -p /app/node
+RUN mkdir -p /app/node/sessions
 
-# Install nginx
-RUN apk add --no-cache nodejs yarn
+# Install required packages
+RUN apk add --no-cache yarn netcat-openbsd sqlite sqlite-dev
 
 # Build Portal
-WORKDIR /app/node/portal
-COPY portal/ .
-RUN yarn
+WORKDIR /app/node
+COPY app/ .
 
-# Change rights
-#RUN chown www-data:www-data -R /app/node
+# Production build with error logging
+RUN yarn install --production \
+    && yarn cache clean
 
-# Copy Nginx configuration file
-COPY nginx/proxy.conf /etc/nginx/conf.d/default.conf
+# Add healthcheck with proper logging
+HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
+    CMD nc -z localhost 3000 || (echo "Health check failed" && exit 1)
 
-# Copy a custom startup script
-COPY script/startup.sh /startup.sh
-COPY script/cloudflare_nginx.sh /cloudflare_nginx.sh
-RUN chmod +x /*.sh
+# Add startup script with error handling first
+COPY docker-entrypoint.sh /
+RUN chmod +x /docker-entrypoint.sh
 
+# Create non-root user and set permissions after chmod
+RUN adduser -D nodeuser && \
+    chown -R nodeuser:nodeuser /app/node && \
+    chown nodeuser:nodeuser /docker-entrypoint.sh && \
+    chown -R nodeuser:nodeuser /app/node/sessions
 
-WORKDIR /app/node/portal
-#USER www-data
+# Switch to non-root user
+USER nodeuser
 
-EXPOSE 80
-CMD ["/startup.sh"]
+EXPOSE 3000
+
+ENTRYPOINT ["/docker-entrypoint.sh"]
+CMD ["yarn", "start"]

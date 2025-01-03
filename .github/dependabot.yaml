@@ -4,7 +4,7 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "weekly"
-    target-branch: "dev"
+    target-branch: "main"
      # Add reviewers
     reviewers:
       - "MaxWaldorf"
@@ -13,22 +13,14 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "weekly"
-    target-branch: "dev"
-    reviewers:
-      - "MaxWaldorf"
-      
-  - package-ecosystem: "npm" # See documentation for possible values
-    directory: "/portal" # Location of package manifests
-    schedule:
-      interval: "weekly"
-    target-branch: "dev"
+    target-branch: "main"
     reviewers:
       - "MaxWaldorf"
 
   - package-ecosystem: "yarn" # See documentation for possible values
-    directory: "/portal" # Location of package manifests
+    directory: "/app" # Location of package manifests
     schedule:
       interval: "weekly"
-    target-branch: "dev"
+    target-branch: "main"
     reviewers:
       - "MaxWaldorf"

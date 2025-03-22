@@ -54,6 +54,7 @@ async function loadLicenses() {
                 <td><code>${license.key}</code></td>
                 <td>
                     <button class="btn btn-primary" onclick="viewLicenseDetails('${license.id}')">View</button>
+                    <button class="btn btn-warning" onclick="renewLicense('${license.id}')">Renew</button>
                     <button class="btn btn-danger" onclick="confirmDeleteLicense('${license.id}')">Delete</button>
                 </td>
             `;
@@ -88,7 +89,9 @@ async function viewLicenseDetails(licenseId) {
         await fetchMachines(licenseId);
 
         // Scroll to the license details block
-        document.getElementById('license-details-block').scrollIntoView({ behavior: 'smooth' });
+        const licenseDetailsBlock = document.getElementById('license-details-block');
+        licenseDetailsBlock.setAttribute('data-license-id', licenseId); // Set the data-license-id attribute
+        licenseDetailsBlock.scrollIntoView({ behavior: 'smooth' });
     } catch (error) {
         console.error('Error loading license details:', error);
         alert('Failed to load license details. Please try again later.');
@@ -552,6 +555,38 @@ async function deleteSelectedUser() {
     } catch (error) {
         console.error('Error deleting user:', error);
         alert('Failed to delete user. Please try again later.');
+    }
+}
+
+async function renewLicense(licenseId) {
+    try {
+        const response = await fetch(`/api/admin/renewlicense/${licenseId}`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to renew license');
+        }
+
+        const data = await response.json();
+        if (data.success) {
+            alert('License renewed successfully');
+            loadLicenses(); // Refresh the licenses list
+
+            // Check if the license details block is visible and matches the renewed license ID
+            const licenseDetailsBlock = document.getElementById('license-details-block');
+            if (licenseDetailsBlock.style.display !== 'none' && licenseDetailsBlock.getAttribute('data-license-id') === licenseId) {
+                viewLicenseDetails(licenseId); // Reload the license details
+            }
+        } else {
+            alert('Failed to renew license');
+        }
+    } catch (error) {
+        console.error('Error renewing license:', error);
+        alert('Failed to renew license. Please try again later.');
     }
 }
 

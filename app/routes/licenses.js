@@ -706,4 +706,37 @@ router.delete('/admin/users/:userId', checkAdmin, attachUser, async (req, res) =
     }
 });
 
+// Renew a license (admin only)
+router.post('/admin/renewlicense/:licenseId', checkAdmin, attachUser, async (req, res) => {
+    const { licenseId } = req.params;
+    const adminEmail = req.user.email;
+
+    try {
+        const response = await axios.post(
+            `${process.env.KEYGEN_URL}/v1/accounts/${process.env.KEYGEN_ACCOUNT_ID}/licenses/${licenseId}/actions/renew`,
+            {},
+            {
+                headers: {
+                    'Authorization': `Bearer ${process.env.KEYGEN_TOKEN}`,
+                    'Accept': 'application/vnd.api+json',
+                },
+            }
+        );
+
+        if (response.status !== 200) {
+            console.error('[Backend] Error renewing license:', response.status);
+            logAdminAction(adminEmail, 'RENEW_LICENSE_FAILED', { licenseId, statusCode: response.status });
+            return res.status(response.status).json({ error: 'Failed to renew license' });
+        }
+
+        logAdminAction(adminEmail, 'RENEW_LICENSE_SUCCESS', { licenseId, statusCode: response.status });
+        res.json({ success: true });
+
+    } catch (error) {
+        console.error('[Backend] Server Error:', error);
+        logAdminAction(adminEmail, 'RENEW_LICENSE_ERROR', { licenseId, error: error.message });
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 module.exports = router;

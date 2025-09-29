@@ -1,7 +1,7 @@
 {
   "name": "keygen-sh-ssp",
   "version": "1.0.0",
-  "description": "Fully Packaged Self-Service Portal for Keygen.sh with keycloak SSO",
+  "description": "Fully Packaged Self-Service Portal for Keygen.sh with generic OIDC SSO",
   "main": "index.js",
   "author": "MaxWaldorf",
   "license": "MIT",
@@ -20,8 +20,8 @@
     "dotenv": "^16.4.7",
     "ejs": "^3.1.10",
     "express": "^4.21.2",
+    "express-openid-connect": "^2.19.2",
     "express-session": "^1.18.1",
-    "keycloak-connect": "^26.0.7",
     "path": "^0.12.7",
     "sqlite3": "^5.1.7",
     "winston": "^3.17.0"

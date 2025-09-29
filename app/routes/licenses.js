@@ -5,16 +5,15 @@ const { logAdminAction } = require('../utils/logger');
 
 // Middleware to attach user information to the request
 function attachUser(req, res, next) {
-    const token = req.kauth.grant.access_token.content;
-    const clientId = process.env.KEYCLOAK_ID;
-    const roles = token.resource_access?.[clientId]?.roles || [];
+    const user = req.oidc.user;
+    const roles = user.roles || [];
 
     req.user = {
-        email: token.email,
+        email: user.email,
         roles: roles
     };
     console.log('User attached to request:', req.user);
-    logAdminAction(token.email, 'USER_LOGIN_INFO', {
+    logAdminAction(user.email, 'USER_LOGIN_INFO', {
         info: 'User logged in'
     });
     next();
@@ -22,21 +21,20 @@ function attachUser(req, res, next) {
 
 // Middleware to check admin permissions
 function checkAdmin(req, res, next) {
-    const token = req.kauth.grant.access_token.content;
-    const clientId = process.env.KEYCLOAK_ID;
-    const roles = token.resource_access?.[clientId]?.roles || [];
+    const user = req.oidc.user;
+    const roles = user.roles || [];
 
     console.log('Checking admin permissions...');
 
-    if (roles.includes('admin')) {
+    if (roles.includes('Administrator')) {
         console.log('User is admin');
-        logAdminAction(token.email, 'USER_ADMIN_CHECK', {
+        logAdminAction(user.email, 'USER_ADMIN_CHECK', {
             valid: true
         });
         next();
     } else {
         console.log('User is not admin');
-        logAdminAction(token.email, 'USER_ADMIN_CHECK', {
+        logAdminAction(user.email, 'USER_ADMIN_CHECK', {
             valid: false
         });
         res.status(403).json({ error: 'Forbidden: Admin access required' });

@@ -30,6 +30,13 @@
                 <div class="user-info">
                     <p>Username: <%= user.username %></p>
                     <p>Email: <%= user.email %></p>
+                    <p>Client Roles:
+                                <% if (user.roles && user.roles.length > 0) { %>
+                                    <span class="role-badge admin"><%= user.roles.join(', ') %></span>
+                                <% } else { %>
+                                    <span class="role-badge">No specific roles assigned</span>
+                                <% } %>
+                    </p>
                 </div>
             </section>
             <!-- Block Two: License Information -->

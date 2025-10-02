@@ -1,6 +1,11 @@
 # Keygen Self-Service Portal
 (with OIDC authentication, e.g. Authentik, Keycloak)
 
+<div style="border-left:6px solid orange;padding:12px;border-radius:6px">
+<strong>⚠️ Version 2.x Warning</strong>: This version introduces breaking changes from previous versions and requires proper reconfiguration of your environment variables and OIDC settings.
+</div><br />
+
+
 This is based on an example made by the keygen.sh team [here](https://github.com/keygen-sh/example-react-licensing-portal)...
 
 The portal offers the following functionality:

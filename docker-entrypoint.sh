@@ -4,7 +4,7 @@ set -e
 check_env_vars() {
     local missing_vars=0
     # Updated required variables to match application env names
-    local required_vars="OIDC_ISSUER OIDC_CLIENT_ID OIDC_CLIENT_SECRET OIDC_REDIRECT_URI KEYGEN_URL KEYGEN_ACCOUNT_ID KEYGEN_TOKEN"
+    local required_vars="OIDC_ISSUER OIDC_CLIENT_ID OIDC_CLIENT_SECRET KEYGEN_URL KEYGEN_ACCOUNT_ID KEYGEN_TOKEN"
 
     for var in $required_vars; do
         if [ -z "$(eval echo \${$var})" ]; then

@@ -67,9 +67,9 @@ app.use(express.static(path.join(__dirname, 'public')));
  */
 
 // OIDC config - derive baseURL and callback path using BASE_APP_URL and OIDC_REDIRECT_URI
-const baseAppUrl = process.env.BASE_APP_URL;
-const redirectUri = process.env.OIDC_REDIRECT_URI;
+const baseAppUrl = process.env.OIDC_REDIRECT_URI;
 const callbackFallback = process.env.OIDC_CALLBACK_PATH || '/auth/callback';
+const redirectUri = baseAppUrl + callbackFallback
 
 if (!baseAppUrl && !redirectUri) {
   console.error('Missing BASE_APP_URL and OIDC_REDIRECT_URI. Set at least BASE_APP_URL in .env');

@@ -6,7 +6,7 @@ const { logAdminAction } = require('../utils/logger');
 // Middleware to attach user information to the request
 function attachUser(req, res, next) {
     const user = req.oidc.user;
-    const roles = user.roles || [];
+    const roles = req.oidc.user?.[process.env.OIDC_ROLES_PROPERTY || 'roles'] || [];
 
     req.user = {
         email: user.email,
@@ -22,7 +22,7 @@ function attachUser(req, res, next) {
 // Middleware to check admin permissions
 function checkAdmin(req, res, next) {
     const user = req.oidc.user;
-    const roles = user.roles || [];
+    const roles = req.oidc.user?.[process.env.OIDC_ROLES_PROPERTY || 'roles'] || [];
 
     console.log('Checking admin permissions...');
 

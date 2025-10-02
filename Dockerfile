@@ -6,7 +6,7 @@ ARG BUILD_RFC3339="2024-12-29T16:00:00Z"
 ARG REVISION="local"
 ARG DESCRIPTION="Fully Packaged Self-Service Portal for Keygen.sh with keycloak SSO"
 ARG PACKAGE="flcontainers/keygen-sh-ssp"
-ARG VERSION="1.0.0"
+ARG VERSION="2.0.0"
 
 LABEL org.opencontainers.image.ref.name="${PACKAGE}" \
   org.opencontainers.image.created=$BUILD_RFC3339 \

@@ -21,6 +21,14 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Derive VERSION from tag (strip leading "v")
+        id: vars
+        run: |
+          TAG_NAME="${GITHUB_REF_NAME}"
+          # strip leading "v" if present (so v1.2.3 -> 1.2.3)
+          TAG_NAME="${TAG_NAME#v}"
+          echo "VERSION=${TAG_NAME}" >> $GITHUB_OUTPUT
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -57,3 +65,5 @@ jobs:
           platforms: linux/amd64,linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ steps.vars.outputs.VERSION }}

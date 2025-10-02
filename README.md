@@ -24,7 +24,6 @@ _Note: You can use a local `.env` at the root of the application or container va
 - OIDC_ISSUER * (Base URL of your OIDC provider, e.g. `https://auth.example.com`)
 - OIDC_CLIENT_ID * (Client ID registered with your OIDC provider)
 - OIDC_CLIENT_SECRET * (Client secret registered with your OIDC provider)
-- OIDC_REDIRECT_URI * (Redirect URI registered with your OIDC provider, e.g. `https://your-app-domain.com`)
 - OIDC_ROLES_PROPERTY (Name of the property in the OIDC user payload that contains user roles, e.g. `roles`, `groups`)
 
 ### Keygen Data
@@ -33,16 +32,16 @@ _Note: You can use a local `.env` at the root of the application or container va
 - KEYGEN_TOKEN * (Keygen admin bearer token)
 
 ### Other Data
-- SESSION * (Session secret for your portal)
+- BASE_APP_URL * (Redirect URI registered with your OIDC provider, e.g. `https://your-app-domain.com`)
+- SESSION (Session secret for your portal)
 
 ### Example `.env`
 ```
 OIDC_ISSUER=https://auth.example.com
 OIDC_CLIENT_ID=my-client-id
 OIDC_CLIENT_SECRET=my-client-secret
-OIDC_REDIRECT_URI=https://your-app-domain.com
 OIDC_ROLES_PROPERTY=roles
-SESSION=your-session-secret
+BASE_APP_URL=https://your-app-domain.com
 
 KEYGEN_URL=https://key.myserver.org
 KEYGEN_ACCOUNT_ID=your-keygen-account-id

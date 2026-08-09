@@ -368,6 +368,10 @@ main {
     border-top: 1px solid var(--border-color);
 }
 
+.load-sentinel {
+    height: 40px;
+}
+
 /* License Details Block */
 .license-details-block {
     border: 2px solid var(--bg-tertiary);

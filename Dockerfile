@@ -27,15 +27,15 @@ RUN mkdir -p /app/node
 RUN mkdir -p /app/node/sessions
 
 # Install required packages
-RUN apk add --no-cache yarn netcat-openbsd sqlite sqlite-dev
+RUN apk add --no-cache netcat-openbsd sqlite sqlite-dev
 
 # Build Portal
 WORKDIR /app/node
 COPY app/ .
 
 # Production build with error logging
-RUN yarn install --production \
-    && yarn cache clean
+RUN npm ci --omit=dev \
+    && npm cache clean --force
 
 # Add healthcheck with proper logging
 HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
@@ -57,4 +57,4 @@ USER nodeuser
 EXPOSE 3000
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
-CMD ["yarn", "start"]
+CMD ["npm", "start"]

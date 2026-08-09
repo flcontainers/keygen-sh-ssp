@@ -15,6 +15,18 @@ const POLICIES_TTL_MS = 30 * 60 * 1000;
 // a machine directly against Keygen), which we have no write-side hook for - keep this one short.
 const MACHINES_TTL_MS = 30 * 1000;
 
+// AxiosError carries the full outgoing request config - including the
+// Authorization: Bearer KEYGEN_TOKEN header - as an own enumerable property, so
+// logging the raw error object prints our admin token straight into the logs.
+// Only ever log this sanitized shape (Keygen's response, not our request).
+function safeErrorInfo(error) {
+    return {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+    };
+}
+
 // Middleware to attach user information to the request
 function attachUser(req, res, next) {
     const user = req.oidc.user;
@@ -31,14 +43,18 @@ function attachUser(req, res, next) {
     next();
 }
 
+function isAdmin(req) {
+    const roles = req.oidc.user?.[process.env.OIDC_ROLES_PROPERTY || 'roles'] || [];
+    return roles.includes('Administrator');
+}
+
 // Middleware to check admin permissions
 function checkAdmin(req, res, next) {
     const user = req.oidc.user;
-    const roles = req.oidc.user?.[process.env.OIDC_ROLES_PROPERTY || 'roles'] || [];
 
     console.log('Checking admin permissions...');
 
-    if (roles.includes('Administrator')) {
+    if (isAdmin(req)) {
         console.log('User is admin');
         logAdminAction(user.email, 'USER_ADMIN_CHECK', {
             valid: true
@@ -53,53 +69,67 @@ function checkAdmin(req, res, next) {
     }
 }
 
+async function fetchUserLicenses(userEmail) {
+    let licenses = [];
+    let pageNumber = 1;
+    let hasMoreLicenses = true;
+
+    while (hasMoreLicenses) {
+        const response = await axios.get(
+            `${process.env.KEYGEN_URL}/v1/accounts/${process.env.KEYGEN_ACCOUNT_ID}/licenses?page%5Bsize%5D=100&page%5Bnumber%5D=${pageNumber}&user=${userEmail}`,
+            {
+                headers: {
+                    'Authorization': `Bearer ${process.env.KEYGEN_TOKEN}`,
+                    'Accept': 'application/vnd.api+json',
+                },
+            }
+        );
+
+        if (response.status !== 200) {
+            console.error('[License Service] Error fetching licenses:', response.status);
+            throw Object.assign(new Error('Failed to fetch licenses'), { status: response.status });
+        }
+
+        const data = response.data;
+
+        if (!data || !data.data || data.data.length === 0) {
+            hasMoreLicenses = false;
+        } else {
+            licenses = licenses.concat(data.data.map(license => ({
+                id: license.id,
+                name: license.attributes.name,
+                key: license.attributes.key,
+            })));
+            pageNumber++;
+        }
+    }
+
+    return licenses;
+}
+
+function getUserLicenses(userEmail) {
+    return cache.getOrSet(`licenses:user:${userEmail}`, LICENSES_TTL_MS, () => fetchUserLicenses(userEmail));
+}
+
+// Admins can reach any license; everyone else only their own - checked against
+// Keygen's own user->license filter rather than trusting anything client-supplied.
+async function assertLicenseAccess(req, licenseId) {
+    if (isAdmin(req)) return;
+
+    const licenses = await getUserLicenses(req.user.email);
+    if (!licenses.some(license => license.id === licenseId)) {
+        throw Object.assign(new Error('Forbidden'), { status: 403 });
+    }
+}
+
 // Fetch licenses for a specific user
 router.get('/user/licenses', attachUser, async (req, res) => {
     try {
-        const userEmail = req.user.email; // Assuming the user object is attached to the request
-
-        const allLicenses = await cache.getOrSet(`licenses:user:${userEmail}`, LICENSES_TTL_MS, async () => {
-            let licenses = [];
-            let pageNumber = 1;
-            let hasMoreLicenses = true;
-
-            while (hasMoreLicenses) {
-                const response = await axios.get(
-                    `${process.env.KEYGEN_URL}/v1/accounts/${process.env.KEYGEN_ACCOUNT_ID}/licenses?page%5Bsize%5D=100&page%5Bnumber%5D=${pageNumber}&user=${userEmail}`,
-                    {
-                        headers: {
-                            'Authorization': `Bearer ${process.env.KEYGEN_TOKEN}`,
-                            'Accept': 'application/vnd.api+json',
-                        },
-                    }
-                );
-
-                if (response.status !== 200) {
-                    console.error('[License Service] Error fetching licenses:', response.status);
-                    throw Object.assign(new Error('Failed to fetch licenses'), { status: response.status });
-                }
-
-                const data = response.data;
-
-                if (!data || !data.data || data.data.length === 0) {
-                    hasMoreLicenses = false;
-                } else {
-                    licenses = licenses.concat(data.data.map(license => ({
-                        id: license.id,
-                        name: license.attributes.name,
-                        key: license.attributes.key,
-                    })));
-                    pageNumber++;
-                }
-            }
-
-            return licenses;
-        });
-
+        const allLicenses = await getUserLicenses(req.user.email);
         res.json({ licenses: allLicenses });
 
     } catch (error) {
-        console.error('[License Service] Error:', error);
+        console.error('[License Service] Error:', safeErrorInfo(error));
         res.status(error.status || 500).json({
             error: error.status ? 'Failed to fetch licenses' : 'Internal server error'
         });
@@ -151,7 +181,7 @@ router.get('/admin/licenses', checkAdmin, attachUser, async (req, res) => {
         res.json({ licenses: allLicenses });
 
     } catch (error) {
-        console.error('[License Service] Error:', error);
+        console.error('[License Service] Error:', safeErrorInfo(error));
         res.status(error.status || 500).json({
             error: error.status ? 'Failed to fetch licenses' : 'Internal server error'
         });
@@ -162,6 +192,7 @@ router.get('/admin/licenses', checkAdmin, attachUser, async (req, res) => {
 router.get('/licenses/:licenseId', attachUser, async (req, res) => {
     try {
         const { licenseId } = req.params;
+        await assertLicenseAccess(req, licenseId);
 
         const license = await cache.getOrSet(`licenses:detail:${licenseId}`, LICENSES_TTL_MS, async () => {
             // Fetch specific license details
@@ -195,7 +226,10 @@ router.get('/licenses/:licenseId', attachUser, async (req, res) => {
         res.json({ license });
 
     } catch (error) {
-        console.error('[License Service] Error:', error);
+        if (error.status === 403) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+        console.error('[License Service] Error:', safeErrorInfo(error));
         res.status(error.status || 500).json({
             error: error.status ? 'Failed to fetch license details' : 'Internal server error'
         });
@@ -206,6 +240,7 @@ router.get('/licenses/:licenseId', attachUser, async (req, res) => {
 router.get('/licenses/:licenseId/machines', attachUser, async (req, res) => {
     try {
         const { licenseId } = req.params;
+        await assertLicenseAccess(req, licenseId);
 
         const machines = await cache.getOrSet(`machines:license:${licenseId}`, MACHINES_TTL_MS, async () => {
             const response = await axios.get(
@@ -235,7 +270,10 @@ router.get('/licenses/:licenseId/machines', attachUser, async (req, res) => {
         res.json({ machines });
 
     } catch (error) {
-        console.error('[License Service] Error:', error);
+        if (error.status === 403) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+        console.error('[License Service] Error:', safeErrorInfo(error));
         res.status(error.status || 500).json({
             error: error.status ? 'Failed to fetch machines' : 'Internal server error'
         });
@@ -285,7 +323,7 @@ router.delete('/admin/licenses/:licenseId', checkAdmin, attachUser, async (req, 
         res.json({ success: true });
 
     } catch (error) {
-        console.error('[Backend] Server Error:', error);
+        console.error('[Backend] Server Error:', safeErrorInfo(error));
         logAdminAction(adminEmail, 'DELETE_LICENSE_ERROR', {
             licenseId,
             error: error.message
@@ -339,7 +377,7 @@ router.get('/admin/groups', checkAdmin, attachUser, async (req, res) => {
         res.json({ groups: allGroups });
 
     } catch (error) {
-        console.error('[License Service] Error:', error);
+        console.error('[License Service] Error:', safeErrorInfo(error));
         res.status(error.status || 500).json({
             error: error.status ? 'Failed to fetch groups' : 'Internal server error'
         });
@@ -389,7 +427,7 @@ router.get('/admin/policies', checkAdmin, attachUser, async (req, res) => {
         res.json({ policies: allPolicies });
 
     } catch (error) {
-        console.error('[License Service] Error:', error);
+        console.error('[License Service] Error:', safeErrorInfo(error));
         res.status(error.status || 500).json({
             error: error.status ? 'Failed to fetch policies' : 'Internal server error'
         });
@@ -439,7 +477,7 @@ router.get('/admin/users', checkAdmin, attachUser, async (req, res) => {
         res.json({ users: allUsers });
 
     } catch (error) {
-        console.error('[License Service] Error:', error);
+        console.error('[License Service] Error:', safeErrorInfo(error));
         res.status(error.status || 500).json({
             error: error.status ? 'Failed to fetch users' : 'Internal server error'
         });
@@ -533,7 +571,7 @@ router.post('/admin/licenses', checkAdmin, attachUser, async (req, res) => {
         res.json({ success: true, license: createdLicense });
 
     } catch (error) {
-        console.error('[License Service] Error:', error);
+        console.error('[License Service] Error:', safeErrorInfo(error));
         logAdminAction(adminEmail, 'CREATE_LICENSE_ERROR', 
             { name, policyId, groupId, userId, error: error.message }
         );
@@ -637,6 +675,8 @@ router.post('/fetchMachines', attachUser, async (req, res) => {
     console.log('[Backend] Path: /fetchMachines, Checked License ID:', licenseId);
 
     try {
+        await assertLicenseAccess(req, licenseId);
+
         const machines = await cache.getOrSet(`machines:license:${licenseId}`, MACHINES_TTL_MS, async () => {
             // Fetch machines associated with the license key
             const machinesResponse = await axios.get(
@@ -682,26 +722,52 @@ router.post('/fetchMachines', attachUser, async (req, res) => {
         if (error.apiErrors) {
             return res.json({ errors: error.apiErrors });
         }
+        if (error.status === 403) {
+            return res.status(403).json({
+                errors: [{ title: 'Forbidden', detail: 'You do not have access to this license.' }],
+            });
+        }
         if (error.status === 404) {
             return res.status(404).json({
                 errors: [{ title: 'License check error', detail: 'There was an issue checking the machine id.' }],
             });
         }
         // Handle any unexpected errors in the entire chain
-        console.error('[Backend] Server Error:', error);
+        console.error('[Backend] Server Error:', safeErrorInfo(error));
         res.status(500).json({
             errors: [{ title: 'Server Error', detail: error.message }],
         });
     }
 });
 
+async function getMachineLicenseId(machineId) {
+    const response = await axios.get(
+        `${process.env.KEYGEN_URL}/v1/accounts/${process.env.KEYGEN_ACCOUNT_ID}/machines/${machineId}`,
+        {
+            headers: {
+                'Authorization': `Bearer ${process.env.KEYGEN_TOKEN}`,
+                'Accept': 'application/vnd.api+json',
+            },
+        }
+    );
+
+    if (response.status !== 200) {
+        throw Object.assign(new Error('Failed to fetch machine'), { status: response.status });
+    }
+
+    return response.data?.data?.relationships?.license?.data?.id || null;
+}
+
 // Deactivate a machine
 router.delete('/deactivateMachine/:machineId', attachUser, async (req, res) => {
     const { machineId } = req.params;
-    const { licenseId } = req.query;
 
     try {
-        // Deactivate the machine
+        // Resolve the machine's actual license from Keygen rather than trusting the
+        // client-supplied licenseId query param, which is what a caller would forge.
+        const licenseId = await getMachineLicenseId(machineId);
+        await assertLicenseAccess(req, licenseId);
+
         const response = await axios.delete(
             `${process.env.KEYGEN_URL}/v1/accounts/${process.env.KEYGEN_ACCOUNT_ID}/machines/${machineId}`,
             {
@@ -719,19 +785,15 @@ router.delete('/deactivateMachine/:machineId', attachUser, async (req, res) => {
             });
         }
 
-        if (licenseId) {
-            // Caller told us which license this machine belonged to - splice it out directly.
-            cache.update(`machines:license:${licenseId}`, list => list.filter(m => m.id !== machineId));
-        } else {
-            // Fallback for callers that don't pass licenseId: we can't target the one affected
-            // cache entry, so clear the whole namespace.
-            cache.del('machines:*');
-        }
+        cache.update(`machines:license:${licenseId}`, list => list.filter(m => m.id !== machineId));
         res.json({ success: true });
 
     } catch (error) {
-        console.error('[Backend] Server Error:', error);
-        res.status(500).json({
+        if (error.status === 403) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+        console.error('[Backend] Server Error:', safeErrorInfo(error));
+        res.status(error.status && error.status !== 500 ? error.status : 500).json({
             error: 'Internal server error'
         });
     }
@@ -771,7 +833,7 @@ router.delete('/admin/users/:userId', checkAdmin, attachUser, async (req, res) =
         logAdminAction(adminEmail, 'DELETE_USER_SUCCESS', userId);
 
     } catch (error) {
-        console.error('[Backend] Server Error:', error);
+        console.error('[Backend] Server Error:', safeErrorInfo(error));
         res.status(500).json({
             error: 'Internal server error'
         });
@@ -821,7 +883,7 @@ router.post('/admin/renewlicense/:licenseId', checkAdmin, attachUser, async (req
         res.json({ success: true });
 
     } catch (error) {
-        console.error('[Backend] Server Error:', error);
+        console.error('[Backend] Server Error:', safeErrorInfo(error));
         logAdminAction(adminEmail, 'RENEW_LICENSE_ERROR', { licenseId, error: error.message });
         res.status(500).json({ error: 'Internal server error' });
     }

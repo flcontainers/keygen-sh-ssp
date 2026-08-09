@@ -63,9 +63,13 @@ function getLicenseLoadObserver() {
 
 function buildLicenseRow(license) {
     const row = document.createElement('tr');
+    const status = license.status || 'UNKNOWN';
+    const statusLower = status.toLowerCase();
+    const statusClass = statusLower === 'active' ? 'active' : statusLower === 'inactive' ? 'inactive' : 'other';
     row.innerHTML = `
-        <td><code>${license.name}</code></td>
-        <td><code>${license.key}</code></td>
+        <td><code>${escapeHtml(license.name)}</code></td>
+        <td><code>${escapeHtml(license.key)}</code></td>
+        <td><span class="status-badge ${statusClass}">${escapeHtml(status)}</span></td>
         <td>
             <button class="btn btn-primary" onclick="viewLicenseDetails('${license.id}')">View</button>
             <button class="btn btn-warning" onclick="renewLicense('${license.id}')">Renew</button>
@@ -97,7 +101,7 @@ function renderLicensesFromScratch() {
     renderedCount = 0;
 
     if (visibleLicenses.length === 0) {
-        licensesTableBody.innerHTML = '<tr><td colspan="3">No licenses found.</td></tr>';
+        licensesTableBody.innerHTML = '<tr><td colspan="4">No licenses found.</td></tr>';
         document.getElementById('licenses-load-sentinel').style.display = 'none';
         return;
     }
@@ -122,12 +126,45 @@ async function loadLicenses() {
         const data = await response.json();
         allLicenses = data.licenses;
 
-        // Re-apply whatever search term is currently in the box
+        populateStatusFilter();
+
+        // Re-apply whatever search term/status filter is currently selected
         filterLicenses();
     } catch (error) {
         console.error('Error loading licenses:', error);
         alert('Failed to load licenses. Please try again later.');
     }
+}
+
+// Rebuilds the dropdown from whatever statuses are actually present in allLicenses,
+// so it only ever offers states that are really detected - not a hardcoded guess at
+// Keygen's status enum. Preserves the current selection across refreshes when possible.
+//
+// Counts are derived from allLicenses, which is only ever as fresh as the last
+// loadLicenses() call - itself served from the server's 5-minute license cache. A
+// license whose status changes purely because time passed (e.g. ACTIVE -> EXPIRED)
+// won't be reflected here until that cache entry expires or is explicitly patched
+// (as create/delete/renew already do server-side). Same staleness window as the
+// per-row status badges already have, just more visible as a wrong count.
+function populateStatusFilter() {
+    const statusSelect = document.getElementById('status-filter');
+    const previousValue = statusSelect.value || 'all';
+
+    const countsByStatus = new Map();
+    allLicenses.forEach(license => {
+        if (!license.status) return;
+        countsByStatus.set(license.status, (countsByStatus.get(license.status) || 0) + 1);
+    });
+
+    const statuses = [...countsByStatus.keys()].sort();
+
+    statusSelect.innerHTML = [`<option value="all">All Statuses (${allLicenses.length})</option>`]
+        .concat(statuses.map(status =>
+            `<option value="${status.toLowerCase()}">${escapeHtml(status)} (${countsByStatus.get(status)})</option>`
+        ))
+        .join('');
+
+    statusSelect.value = statuses.some(status => status.toLowerCase() === previousValue) ? previousValue : 'all';
 }
 
 async function viewLicenseDetails(licenseId) {
@@ -196,12 +233,19 @@ async function deleteLicense(licenseId) {
 
 function filterLicenses() {
     const searchInput = document.getElementById('license-search').value.toLowerCase();
+    const statusFilter = document.getElementById('status-filter').value;
 
-    visibleLicenses = searchInput
+    let filtered = searchInput
         ? allLicenses.filter(license =>
             license.name.toLowerCase().includes(searchInput) ||
             license.key.toLowerCase().includes(searchInput))
         : allLicenses;
+
+    if (statusFilter !== 'all') {
+        filtered = filtered.filter(license => (license.status || '').toLowerCase() === statusFilter);
+    }
+
+    visibleLicenses = filtered;
 
     renderLicensesFromScratch();
 }

@@ -45,7 +45,7 @@ async function loadLicenses() {
         console.error('Error loading licenses:', error);
         document.querySelector('#licenses-table tbody').innerHTML = `
             <tr>
-                <td colspan="3" class="error-message">
+                <td colspan="4" class="error-message">
                     Failed to load licenses. Please try again later.
                 </td>
             </tr>
@@ -59,19 +59,25 @@ function displayLicenses(licenses) {
     if (!licenses || licenses.length === 0) {
         licensesTableBody.innerHTML = `
             <tr>
-                <td colspan="3" class="no-licenses">No licenses found</td>
+                <td colspan="4" class="no-licenses">No licenses found</td>
             </tr>
         `;
         return;
     }
 
-    licensesTableBody.innerHTML = licenses.map(license => `
+    licensesTableBody.innerHTML = licenses.map(license => {
+        const status = license.status || 'UNKNOWN';
+        const statusLower = status.toLowerCase();
+        const statusClass = statusLower === 'active' ? 'active' : statusLower === 'inactive' ? 'inactive' : 'other';
+        return `
         <tr>
             <td><code>${escapeHtml(license.name)}</code></td>
             <td><code>${escapeHtml(license.key)}</code></td>
+            <td><span class="status-badge ${statusClass}">${escapeHtml(status)}</span></td>
             <td><button onclick="viewLicenseDetails('${license.id}', '${license.key}')" class="btn btn-primary">View</button></td>
         </tr>
-    `).join('');
+    `;
+    }).join('');
 }
 
 async function viewLicenseDetails(licenseId) {

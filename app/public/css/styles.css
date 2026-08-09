@@ -11,6 +11,11 @@
     --accent-color: #3498db;
     --accent-hover: #2980b9;
     --admin-accent: #e74c3c;
+    --danger-hover: #c0392b;
+    --success-color: #2ecc71;
+    --success-hover: #27ae60;
+    --warning-color: #f39c12;
+    --warning-hover: #e67e22;
 }
 
 /* Dark theme */
@@ -25,6 +30,11 @@
     --accent-color: #4fa3e0;
     --accent-hover: #2980b9;
     --admin-accent: #e74c3c;
+    --danger-hover: #c0392b;
+    --success-color: #2ecc71;
+    --success-hover: #27ae60;
+    --warning-color: #f39c12;
+    --warning-hover: #e67e22;
 }
 
 /* Reset and base styles */
@@ -101,10 +111,6 @@ header h1 {
 .switch-view-btn {
     margin-left: auto;
     font-size: 1em;
-    font-weight: bold;
-    padding: 10px 20px;
-    border-radius: 4px;
-    transition: background-color 0.3s ease;
 }
 
 .user-info, .admin-info {
@@ -210,13 +216,20 @@ main {
     gap: 0.5rem;
 }
 
-.create-license-btn {
-    background-color: #2ecc71;
-    color: white;
+.status-filter-select {
+    padding: 10px 20px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 1em;
+    cursor: pointer;
+    transition: border-color 0.3s ease;
 }
 
-.create-license-btn:hover {
-    background-color: #27ae60;
+.status-filter-select:focus {
+    border-color: var(--accent-color);
+    outline: none;
 }
 
 /* Form styles */
@@ -271,23 +284,6 @@ main {
     outline: none;
 }
 
-.form-group button {
-    width: 100%;
-    padding: 15px;
-    border: none;
-    border-radius: 4px;
-    background-color: var(--accent-color);
-    color: white;
-    font-size: 1em;
-    font-weight: bold;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-}
-
-.form-group button:hover {
-    background-color: var(--accent-hover);
-}
-
 /* Dropdown styles */
 .form-group select {
     overflow-y: auto;
@@ -340,14 +336,18 @@ main {
 }
 
 .licenses-table th:nth-child(1), .licenses-table td:nth-child(1) {
-    width: 25%;
+    width: 20%;
 }
 
 .licenses-table th:nth-child(2), .licenses-table td:nth-child(2) {
-    width: 45%;
+    width: 35%;
 }
 
 .licenses-table th:nth-child(3), .licenses-table td:nth-child(3) {
+    width: 15%;
+}
+
+.licenses-table th:nth-child(4), .licenses-table td:nth-child(4) {
     width: 30%;
     text-align: center;
 }
@@ -514,33 +514,31 @@ main {
     background-color: var(--accent-hover);
 }
 
+.btn-success {
+    background-color: var(--success-color);
+    color: white;
+}
+
+.btn-success:hover {
+    background-color: var(--success-hover);
+}
+
 .btn-danger {
     background-color: var(--admin-accent);
     color: white;
 }
 
 .btn-danger:hover {
-    background-color: #c0392b;
-}
-
-.btn.btn-danger {
-    background-color: #dc3545;
-    border-color: #dc3545;
-    color: white;
-}
-
-.btn.btn-danger:hover {
-    background-color: #c82333;
-    border-color: #bd2130;
+    background-color: var(--danger-hover);
 }
 
 .btn-warning {
-    background-color: #f39c12;
+    background-color: var(--warning-color);
     color: white;
 }
 
 .btn-warning:hover {
-    background-color: #e67e22;
+    background-color: var(--warning-hover);
 }
 
 #createUserModal .form-group input[type="password"] {

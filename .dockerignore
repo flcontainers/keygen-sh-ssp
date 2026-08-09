@@ -1,9 +1,7 @@
 #Ignore npm files
 **/.env
-**.lock
 **/dist/*
 **/node_modules/*
-**/package-lock.json
 
 #Ignore the git and cache folders
 .git

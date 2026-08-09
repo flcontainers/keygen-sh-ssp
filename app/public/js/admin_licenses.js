@@ -30,6 +30,82 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('createLicenseForm')?.addEventListener('submit', createLicense);
 });
 
+// The full list is fetched once (fast - served from the server-side cache) and kept
+// here; rendering to the DOM is what's lazy, so search still runs over the whole dataset.
+let allLicenses = [];
+let visibleLicenses = [];
+let renderedCount = 0;
+const LICENSE_RENDER_BATCH_SIZE = 50;
+
+let licenseLoadObserver = null;
+
+function getLicenseLoadObserver() {
+    if (licenseLoadObserver) return licenseLoadObserver;
+
+    const sentinel = document.getElementById('licenses-load-sentinel');
+    // .table-container scrolls internally (max-height + overflow-y), it's not the
+    // window - the observer's root has to be that container, not the viewport default.
+    licenseLoadObserver = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting) {
+            renderNextLicenseBatch();
+        }
+    }, {
+        root: document.querySelector('.table-container'),
+        // Fire while the sentinel is still ~400px below the visible area, so the next
+        // batch is already in the DOM by the time the user actually scrolls to it -
+        // otherwise the content height (and scrollbar thumb) jumps right at the boundary
+        // the user is looking at, which reads as the scrollbar stuttering/animating.
+        rootMargin: '400px 0px'
+    });
+    licenseLoadObserver.observe(sentinel);
+    return licenseLoadObserver;
+}
+
+function buildLicenseRow(license) {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+        <td><code>${license.name}</code></td>
+        <td><code>${license.key}</code></td>
+        <td>
+            <button class="btn btn-primary" onclick="viewLicenseDetails('${license.id}')">View</button>
+            <button class="btn btn-warning" onclick="renewLicense('${license.id}')">Renew</button>
+            <button class="btn btn-danger" onclick="confirmDeleteLicense('${license.id}')">Delete</button>
+        </td>
+    `;
+    return row;
+}
+
+function renderNextLicenseBatch() {
+    const licensesTableBody = document.querySelector('#licenses-table tbody');
+    const nextBatch = visibleLicenses.slice(renderedCount, renderedCount + LICENSE_RENDER_BATCH_SIZE);
+
+    const fragment = document.createDocumentFragment();
+    nextBatch.forEach(license => fragment.appendChild(buildLicenseRow(license)));
+    licensesTableBody.appendChild(fragment);
+
+    renderedCount += nextBatch.length;
+
+    const sentinel = document.getElementById('licenses-load-sentinel');
+    sentinel.style.display = renderedCount < visibleLicenses.length ? '' : 'none';
+}
+
+// Resets the table and (re)starts incremental rendering from `visibleLicenses`.
+// Called on initial load and whenever the search filter changes.
+function renderLicensesFromScratch() {
+    const licensesTableBody = document.querySelector('#licenses-table tbody');
+    licensesTableBody.innerHTML = '';
+    renderedCount = 0;
+
+    if (visibleLicenses.length === 0) {
+        licensesTableBody.innerHTML = '<tr><td colspan="3">No licenses found.</td></tr>';
+        document.getElementById('licenses-load-sentinel').style.display = 'none';
+        return;
+    }
+
+    renderNextLicenseBatch();
+    getLicenseLoadObserver(); // no-op if already observing
+}
+
 async function loadLicenses() {
     try {
         const response = await fetch('/api/admin/licenses', {
@@ -44,22 +120,10 @@ async function loadLicenses() {
         }
 
         const data = await response.json();
-        const licensesTableBody = document.querySelector('#licenses-table tbody');
-        licensesTableBody.innerHTML = '';
+        allLicenses = data.licenses;
 
-        data.licenses.forEach(license => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td><code>${license.name}</code></td>
-                <td><code>${license.key}</code></td>
-                <td>
-                    <button class="btn btn-primary" onclick="viewLicenseDetails('${license.id}')">View</button>
-                    <button class="btn btn-warning" onclick="renewLicense('${license.id}')">Renew</button>
-                    <button class="btn btn-danger" onclick="confirmDeleteLicense('${license.id}')">Delete</button>
-                </td>
-            `;
-            licensesTableBody.appendChild(row);
-        });
+        // Re-apply whatever search term is currently in the box
+        filterLicenses();
     } catch (error) {
         console.error('Error loading licenses:', error);
         alert('Failed to load licenses. Please try again later.');
@@ -132,20 +196,14 @@ async function deleteLicense(licenseId) {
 
 function filterLicenses() {
     const searchInput = document.getElementById('license-search').value.toLowerCase();
-    const licensesTableBody = document.querySelector('#licenses-table tbody');
-    const rows = licensesTableBody.getElementsByTagName('tr');
 
-    for (let i = 0; i < rows.length; i++) {
-        const cells = rows[i].getElementsByTagName('td');
-        const name = cells[0].textContent.toLowerCase();
-        const key = cells[1].textContent.toLowerCase();
+    visibleLicenses = searchInput
+        ? allLicenses.filter(license =>
+            license.name.toLowerCase().includes(searchInput) ||
+            license.key.toLowerCase().includes(searchInput))
+        : allLicenses;
 
-        if (name.includes(searchInput) || key.includes(searchInput)) {
-            rows[i].style.display = '';
-        } else {
-            rows[i].style.display = 'none';
-        }
-    }
+    renderLicensesFromScratch();
 }
 
 // Function to handle different modals
@@ -473,8 +531,12 @@ function displayLicenseDetails(license) {
 }
 
 async function deactivateMachine(machineId) {
+    const licenseId = document.querySelector('#license-details-block').getAttribute('data-license-id');
+
     try {
-        const response = await fetch(`/api/deactivateMachine/${machineId}`, {
+        // Pass licenseId so the server can patch just this license's cached machine list
+        // instead of clearing every cached machine list.
+        const response = await fetch(`/api/deactivateMachine/${machineId}?licenseId=${encodeURIComponent(licenseId)}`, {
             method: 'DELETE',
             headers: {
                 'Accept': 'application/json'
@@ -489,7 +551,6 @@ async function deactivateMachine(machineId) {
         if (data.success) {
             alert('Machine deactivated successfully');
             // Refresh the machines list
-            const licenseId = document.querySelector('#license-details-block').getAttribute('data-license-id');
             await fetchMachines(licenseId);
         } else {
             alert('Failed to deactivate machine');

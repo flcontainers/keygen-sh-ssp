@@ -17,7 +17,7 @@ updates:
     reviewers:
       - "MaxWaldorf"
 
-  - package-ecosystem: "yarn" # See documentation for possible values
+  - package-ecosystem: "npm" # See documentation for possible values
     directory: "/app" # Location of package manifests
     schedule:
       interval: "weekly"

@@ -71,10 +71,12 @@
                             <tbody>
                                 <!-- Licenses will be loaded here -->
                                 <tr class="loading">
-                                    <td colspan="4">Loading licenses...</td>
+                                    <td colspan="3">Loading licenses...</td>
                                 </tr>
                             </tbody>
                         </table>
+                        <!-- Observed to append the next batch of rows as the user scrolls -->
+                        <div id="licenses-load-sentinel" class="load-sentinel"></div>
                     </div>
                 </div>
 

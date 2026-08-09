@@ -1,0 +1,76 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "timezone": "UTC",
+  "schedule": [
+    "before 6am on monday"
+  ],
+  "labels": [
+    "dependencies"
+  ],
+  "reviewers": [
+    "MaxWaldorf"
+  ],
+  "dependencyDashboard": true,
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
+  "rangeStrategy": "bump",
+  "minimumReleaseAge": "3 days",
+  "osvVulnerabilityAlerts": true,
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": [
+      "dependencies",
+      "security"
+    ],
+    "automerge": false
+  },
+  "packageRules": [
+    {
+      "description": "Routine (non-security) updates for npm/yarn, Dockerfile, and GitHub Actions are already handled by Dependabot (.github/dependabot.yaml). Disable Renovate's regular PRs for these managers to avoid duplicate/competing PRs. Security-vulnerability PRs still get through via vulnerabilityAlerts above, which bypasses this.",
+      "matchManagers": [
+        "npm",
+        "dockerfile",
+        "github-actions"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "Never auto-merge major (breaking) version bumps - always require manual review.",
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "automerge": false,
+      "labels": [
+        "dependencies",
+        "major-update"
+      ]
+    },
+    {
+      "description": "Group minor and patch updates together per manager to reduce PR noise for anything Renovate actively manages.",
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "groupName": "minor and patch updates"
+    },
+    {
+      "description": "Auto-merge only patch-level and lockfile-maintenance updates, and only once required status checks pass.",
+      "matchUpdateTypes": [
+        "patch",
+        "lockFileMaintenance"
+      ],
+      "automerge": true,
+      "automergeType": "pr",
+      "platformAutomerge": true
+    }
+  ],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": [
+      "before 6am on monday"
+    ]
+  }
+}

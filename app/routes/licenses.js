@@ -99,6 +99,8 @@ async function fetchUserLicenses(userEmail) {
                 id: license.id,
                 name: license.attributes.name,
                 key: license.attributes.key,
+                expiry: license.attributes.expiry,
+                status: license.attributes.status,
             })));
             pageNumber++;
         }
@@ -169,6 +171,8 @@ router.get('/admin/licenses', checkAdmin, attachUser, async (req, res) => {
                         id: license.id,
                         name: license.attributes.name,
                         key: license.attributes.key,
+                        expiry: license.attributes.expiry,
+                        status: license.attributes.status,
                         ownerId: license.relationships?.owner?.data?.id || 'unknown'
                     })));
                     pageNumber++;
@@ -563,6 +567,8 @@ router.post('/admin/licenses', checkAdmin, attachUser, async (req, res) => {
             id: createdLicense.data.id,
             name: createdLicense.data.attributes.name,
             key: createdLicense.data.attributes.key,
+            expiry: createdLicense.data.attributes.expiry,
+            status: createdLicense.data.attributes.status,
             ownerId: userId
         }]);
         // We only know the owner's Keygen user id here, not their email, so we can't target
@@ -876,6 +882,11 @@ router.post('/admin/renewlicense/:licenseId', checkAdmin, attachUser, async (req
                 expiry: renewed.attributes.expiry,
                 status: renewed.attributes.status,
             }, LICENSES_TTL_MS);
+            cache.update('licenses:admin:all', list => list.map(l =>
+                l.id === renewed.id
+                    ? { ...l, expiry: renewed.attributes.expiry, status: renewed.attributes.status }
+                    : l
+            ));
         } else {
             cache.del(`licenses:detail:${licenseId}`);
         }

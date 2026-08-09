@@ -30,7 +30,7 @@
                     <div class="section-header">
                         <h2>User Information</h2>
                         <div class="button-group">
-                            <button onclick="openCreateUserModal()" class="btn btn-primary mr-2">Create User</button>
+                            <button onclick="openCreateUserModal()" class="btn btn-primary">Create User</button>
                             <button onclick="openDeleteUserModal()" class="btn btn-danger">Delete User</button>
                         </div>
                     </div>
@@ -56,7 +56,10 @@
                     <div class="search-create-bar">
                         <input type="text" id="license-search" class="search-input" placeholder="Search by name or key" onkeyup="filterLicenses()">
                         <div class="button-group">
-                            <button class="btn btn-success create-license-btn" onclick="openCreateLicenseModal()">Create License</button>
+                            <select id="status-filter" class="status-filter-select" onchange="filterLicenses()">
+                                <option value="all">All Statuses</option>
+                            </select>
+                            <button class="btn btn-success" onclick="openCreateLicenseModal()">Create License</button>
                         </div>
                     </div>
                     <div class="table-container">
@@ -65,13 +68,14 @@
                                 <tr>
                                     <th>Name</th>
                                     <th>Key</th>
+                                    <th>Status</th>
                                     <th>Action</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <!-- Licenses will be loaded here -->
                                 <tr class="loading">
-                                    <td colspan="3">Loading licenses...</td>
+                                    <td colspan="4">Loading licenses...</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -200,7 +204,7 @@
                         <option value="">Select a user</option>
                     </select>
                 </div>
-                <button onclick="deleteSelectedUser()" class="btn btn-danger mt-3">Delete User</button>
+                <button onclick="deleteSelectedUser()" class="btn btn-danger">Delete User</button>
             </div>
         </div>
 

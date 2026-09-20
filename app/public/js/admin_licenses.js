@@ -71,9 +71,9 @@ function buildLicenseRow(license) {
         <td><code>${escapeHtml(license.key)}</code></td>
         <td><span class="status-badge ${statusClass}">${escapeHtml(status)}</span></td>
         <td>
-            <button class="btn btn-primary" onclick="viewLicenseDetails('${license.id}')">View</button>
-            <button class="btn btn-warning" onclick="renewLicense('${license.id}')">Renew</button>
-            <button class="btn btn-danger" onclick="confirmDeleteLicense('${license.id}')">Delete</button>
+            <button class="btn btn-primary" data-action="view-license" data-id="${escapeHtml(license.id)}">View</button>
+            <button class="btn btn-warning" data-action="renew-license" data-id="${escapeHtml(license.id)}">Renew</button>
+            <button class="btn btn-danger" data-action="delete-license" data-id="${escapeHtml(license.id)}">Delete</button>
         </td>
     `;
     return row;
@@ -539,7 +539,7 @@ function displayMachines(machines) {
                 <td><code>${escapeHtml(machine.name || '')}</code></td>
                 <td><code>${escapeHtml(ip || '')}</code></td>
                 <td><code>${escapeHtml(machine.fingerprint || '')}</code></td>
-                <td><button onclick="deactivateMachine('${machine.id}')" class="btn btn-danger">Deactivate</button></td>
+                <td><button data-action="deactivate-machine" data-id="${escapeHtml(machine.id)}" class="btn btn-danger">Deactivate</button></td>
             </tr>
         `;
     }).join('');
@@ -606,10 +606,11 @@ async function deactivateMachine(machineId) {
 }
 
 // Security: Escape HTML to prevent XSS
+// Also escapes quotes so the result is safe inside HTML attribute values.
 function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str;
-    return div.innerHTML;
+    return div.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 function openDeleteUserModal() {
@@ -696,3 +697,17 @@ async function renewLicense(licenseId) {
 }
 
 document.addEventListener('DOMContentLoaded', loadLicenses);
+
+// Row buttons carry data-* attributes instead of inline onclick handlers, so
+// server-supplied values never end up inside executable attribute code.
+const rowActions = {
+    'view-license': viewLicenseDetails,
+    'deactivate-machine': deactivateMachine,
+    'renew-license': renewLicense,
+    'delete-license': confirmDeleteLicense,
+};
+document.addEventListener('click', event => {
+    const button = event.target.closest('[data-action]');
+    const action = button && rowActions[button.dataset.action];
+    if (action) action(button.dataset.id);
+});

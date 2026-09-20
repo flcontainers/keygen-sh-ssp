@@ -32,14 +32,16 @@ function attachUser(req, res, next) {
     const user = req.oidc.user;
     const roles = req.oidc.user?.[process.env.OIDC_ROLES_PROPERTY || 'roles'] || [];
 
+    // Licenses are matched to users by email, so an email the IdP explicitly flags as
+    // unverified must not be trusted. IdPs that omit the claim are unaffected.
+    if (user.email_verified === false && !roles.includes('Administrator')) {
+        return res.status(403).json({ error: 'Forbidden: email address is not verified' });
+    }
+
     req.user = {
         email: user.email,
         roles: roles
     };
-    console.log('User attached to request:', req.user);
-    logAdminAction(user.email, 'USER_LOGIN_INFO', {
-        info: 'User logged in'
-    });
     next();
 }
 
@@ -48,25 +50,13 @@ function isAdmin(req) {
     return roles.includes('Administrator');
 }
 
-// Middleware to check admin permissions
+// Middleware to check admin permissions. Only denials are audit-logged; successful
+// admin actions are already recorded by the handlers that perform them.
 function checkAdmin(req, res, next) {
-    const user = req.oidc.user;
+    if (isAdmin(req)) return next();
 
-    console.log('Checking admin permissions...');
-
-    if (isAdmin(req)) {
-        console.log('User is admin');
-        logAdminAction(user.email, 'USER_ADMIN_CHECK', {
-            valid: true
-        });
-        next();
-    } else {
-        console.log('User is not admin');
-        logAdminAction(user.email, 'USER_ADMIN_CHECK', {
-            valid: false
-        });
-        res.status(403).json({ error: 'Forbidden: Admin access required' });
-    }
+    logAdminAction(req.oidc.user.email, 'USER_ADMIN_CHECK', { valid: false });
+    res.status(403).json({ error: 'Forbidden: Admin access required' });
 }
 
 async function fetchUserLicenses(userEmail) {
@@ -76,7 +66,7 @@ async function fetchUserLicenses(userEmail) {
 
     while (hasMoreLicenses) {
         const response = await axios.get(
-            `${process.env.KEYGEN_URL}/v1/accounts/${process.env.KEYGEN_ACCOUNT_ID}/licenses?page%5Bsize%5D=100&page%5Bnumber%5D=${pageNumber}&user=${userEmail}`,
+            `${process.env.KEYGEN_URL}/v1/accounts/${process.env.KEYGEN_ACCOUNT_ID}/licenses?page%5Bsize%5D=100&page%5Bnumber%5D=${pageNumber}&user=${encodeURIComponent(userEmail)}`,
             {
                 headers: {
                     'Authorization': `Bearer ${process.env.KEYGEN_TOKEN}`,
@@ -108,6 +98,22 @@ async function fetchUserLicenses(userEmail) {
 
     return licenses;
 }
+
+// Keygen IDs are UUIDs. Anything else (e.g. "../" segments or query fragments)
+// must never reach a URL we build for Keygen.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isUuid(value) {
+    return typeof value === 'string' && UUID_RE.test(value);
+}
+
+const rejectInvalidId = (req, res, next, value) => {
+    if (!isUuid(value)) return res.status(400).json({ error: 'Invalid ID' });
+    next();
+};
+router.param('licenseId', rejectInvalidId);
+router.param('machineId', rejectInvalidId);
+router.param('userId', rejectInvalidId);
 
 function getUserLicenses(userEmail) {
     return cache.getOrSet(`licenses:user:${userEmail}`, LICENSES_TTL_MS, () => fetchUserLicenses(userEmail));
@@ -623,7 +629,7 @@ router.post('/admin/createuser', checkAdmin, attachUser, async (req, res) => {
         }
     };
  
-    console.log('[Pre-Request] Attempting user creation with data:', userData);
+    console.log('[Pre-Request] Attempting user creation for:', userEmail);
  
     try {
         const response = await axios.post(
@@ -641,22 +647,30 @@ router.post('/admin/createuser', checkAdmin, attachUser, async (req, res) => {
         );
         
         console.log('[Response] Status:', response.status);
+
+        const createdUser = response.data?.data;
+        if (response.status < 200 || response.status >= 300 || !createdUser) {
+            logAdminAction(adminEmail, 'CREATE_USER_FAILED',
+                { firstName, userName, userEmail, userGroup, statusCode: response.status }
+            );
+            return res.status(response.status >= 400 ? response.status : 502).json({
+                error: response.data?.errors || 'Failed to create user'
+            });
+        }
+
         logAdminAction(adminEmail, 'CREATE_USER_SUCCESS',
             { firstName, userName, userEmail, userGroup }
         );
-        //console.log(`[Request ${requestId}] Completed with status:`, response.status);
 
         // Append the new user to the cached admin list using Keygen's own response,
         // rather than dropping the cache and forcing a full re-fetch.
-        const createdUser = response.data?.data;
-        if (response.status >= 200 && response.status < 300 && createdUser) {
-            cache.update('users:admin:all', list => [...list, {
-                id: createdUser.id,
-                firstName: createdUser.attributes.firstName,
-            }]);
-        }
+        cache.update('users:admin:all', list => [...list, {
+            id: createdUser.id,
+            firstName: createdUser.attributes.firstName,
+        }]);
 
-        res.json({ success: true, user: response.data });
+        // Only what the UI needs - not Keygen's full user document.
+        res.json({ success: true, user: { id: createdUser.id } });
  
     } catch (error) {
         console.log(`[Request ${requestId}] Failed with error:`, error.response?.status);
@@ -666,8 +680,7 @@ router.post('/admin/createuser', checkAdmin, attachUser, async (req, res) => {
         console.error('[Error Details]', {
             status: error.response?.status,
             statusText: error.response?.statusText,
-            data: error.response?.data,
-            headers: error.response?.headers
+            data: error.response?.data
         });
         res.status(error.response?.status || 500).json({
             error: error.response?.data?.errors || 'Internal server error'
@@ -678,6 +691,9 @@ router.post('/admin/createuser', checkAdmin, attachUser, async (req, res) => {
 // Fetch machines associated with a license key
 router.post('/fetchMachines', attachUser, async (req, res) => {
     const { licenseId } = req.body;
+    if (!isUuid(licenseId)) {
+        return res.status(400).json({ error: 'Invalid ID' });
+    }
     console.log('[Backend] Path: /fetchMachines, Checked License ID:', licenseId);
 
     try {

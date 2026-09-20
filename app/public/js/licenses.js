@@ -74,7 +74,7 @@ function displayLicenses(licenses) {
             <td><code>${escapeHtml(license.name)}</code></td>
             <td><code>${escapeHtml(license.key)}</code></td>
             <td><span class="status-badge ${statusClass}">${escapeHtml(status)}</span></td>
-            <td><button onclick="viewLicenseDetails('${license.id}', '${license.key}')" class="btn btn-primary">View</button></td>
+            <td><button data-action="view-license" data-id="${escapeHtml(license.id)}" class="btn btn-primary">View</button></td>
         </tr>
     `;
     }).join('');
@@ -173,7 +173,7 @@ function displayMachines(machines) {
                 <td><code>${escapeHtml(machine.name || '')}</code></td>
                 <td><code>${escapeHtml(ip || '')}</code></td>
                 <td><code>${escapeHtml(machine.fingerprint || '')}</code></td>
-                <td><button onclick="deactivateMachine('${machine.id}')" class="btn btn-danger">Deactivate</button></td>
+                <td><button data-action="deactivate-machine" data-id="${escapeHtml(machine.id)}" class="btn btn-danger">Deactivate</button></td>
             </tr>
         `;
     }).join('');
@@ -237,10 +237,23 @@ async function deactivateMachine(machineId) {
 }
 
 // Security: Escape HTML to prevent XSS
+// Also escapes quotes so the result is safe inside HTML attribute values.
 function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str;
-    return div.innerHTML;
+    return div.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 document.addEventListener('DOMContentLoaded', loadLicenses);
+
+// Row buttons carry data-* attributes instead of inline onclick handlers, so
+// server-supplied values never end up inside executable attribute code.
+const rowActions = {
+    'view-license': viewLicenseDetails,
+    'deactivate-machine': deactivateMachine,
+};
+document.addEventListener('click', event => {
+    const button = event.target.closest('[data-action]');
+    const action = button && rowActions[button.dataset.action];
+    if (action) action(button.dataset.id);
+});

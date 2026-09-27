@@ -60,6 +60,40 @@ function endSession(req, reason) {
     req.appSession = undefined; // clears the cookie; requiresAuth() then sends them to log in
 }
 
+// A page fires several requests at once, all carrying the same session cookie. IdPs that
+// rotate refresh tokens (e.g. Authentik) revoke a refresh token once it's used, so if each
+// request refreshed on its own, all but the first would get invalid_grant and end the session.
+// Requests holding the same refresh token therefore share one refresh, and its result is kept
+// for REFRESH_SHARE_MS so requests the browser sent before receiving the new cookie get it too.
+const REFRESH_SHARE_MS = 30 * 1000;
+const refreshes = new Map(); // refresh token -> Promise of the session fields to apply
+
+function refreshSession(req) {
+    const refreshToken = req.oidc.refreshToken;
+    let shared = refreshes.get(refreshToken);
+    if (shared) return shared;
+
+    shared = (async () => {
+        const idTokenBefore = req.oidc.idToken;
+        await req.oidc.accessToken.refresh();
+
+        // Most IdPs return a new ID token on refresh; if this one didn't, the stored claims
+        // are still the login ones, so ask the userinfo endpoint for the current roles instead.
+        const roles = req.oidc.idToken !== idTokenBefore
+            ? rolesFrom(req.oidc.idTokenClaims)
+            : rolesFrom(await req.oidc.fetchUserInfo());
+
+        const { access_token, id_token, refresh_token, token_type, expires_at } = req.appSession;
+        return { access_token, id_token, refresh_token, token_type, expires_at, roles, rolesVerifiedAt: Date.now() };
+    })();
+    refreshes.set(refreshToken, shared);
+    // Failures are dropped at once so the next request retries (e.g. once the IdP is back).
+    shared.then(
+        () => setTimeout(() => refreshes.delete(refreshToken), REFRESH_SHARE_MS).unref(),
+        () => refreshes.delete(refreshToken));
+    return shared;
+}
+
 // Middleware, mounted after auth(). Only sessions that currently hold the admin role are
 // re-verified: losing a regular role grants nothing, and gaining admin simply takes a new login.
 async function revalidateRoles(req, res, next) {
@@ -73,17 +107,7 @@ async function revalidateRoles(req, res, next) {
     }
 
     try {
-        const idTokenBefore = req.oidc.idToken;
-        await req.oidc.accessToken.refresh();
-
-        // Most IdPs return a new ID token on refresh; if this one didn't, the stored claims
-        // are still the login ones, so ask the userinfo endpoint for the current roles instead.
-        const roles = req.oidc.idToken !== idTokenBefore
-            ? rolesFrom(req.oidc.idTokenClaims)
-            : rolesFrom(await req.oidc.fetchUserInfo());
-
-        req.appSession.roles = roles;
-        req.appSession.rolesVerifiedAt = Date.now();
+        Object.assign(req.appSession, await refreshSession(req));
     } catch (error) {
         if (isRejection(error)) {
             endSession(req, `IdP rejected the refresh (${error.error || error.name})`);

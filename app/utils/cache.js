@@ -78,7 +78,7 @@ async function getOrSet(key, ttlMs, fetchFn, staleMs = 0) {
 
     if (entry && isUsable(entry, now)) {
         refresh(key, ttlMs, staleMs, fetchFn).catch(error => {
-            console.error(`[Cache] Background refresh failed for ${key}:`, error.message);
+            console.error('[Cache] Background refresh failed for %s:', key, error.message);
         });
         return entry.value;
     }

@@ -13,7 +13,7 @@
 </head>
 <body>
     <div class="theme-toggle-container">
-        <button id="theme-toggle" onclick="toggleTheme()" class="theme-toggle-btn"></button>
+        <button id="theme-toggle" class="theme-toggle-btn"></button>
     </div>
     <div class="container">
         <header>
@@ -44,7 +44,7 @@
                 <div class="licenses-container">
                     <h2>License Information</h2>
                     <div class="search-create-bar">
-                        <input type="text" id="license-search" class="search-input" placeholder="Search by name or key" onkeyup="filterLicenses()">
+                        <input type="text" id="license-search" class="search-input" placeholder="Search by name or key">
                     </div>
                     <div class="table-container">
                         <table id="licenses-table" class="licenses-table">
@@ -67,7 +67,7 @@
                 </div>
 
                 <!-- License Details Block -->
-                <div id="license-details-block" class="license-details-block" style="display: none;">
+                <div id="license-details-block" class="license-details-block" hidden>
                     <h3>License Details</h3>
                     <div id="license-details-content" class="license-details-content">
                         <!-- License details will be loaded here -->
@@ -75,7 +75,7 @@
                 </div>
 
                 <!-- Machines List Block -->
-                <div id="machines-list-block" class="machines-list-block" style="display: none;">
+                <div id="machines-list-block" class="machines-list-block" hidden>
                     <h3>Machines List</h3>
                     <table id="machines-table" class="machines-table">
                         <thead>
@@ -96,7 +96,7 @@
         </main>
     </div>
 
-    <script id="user-roles" type="application/json"><%- JSON.stringify(user.roles) %></script>
+    <script id="user-roles" type="application/json"><%- JSON.stringify(user.roles).replace(/</g, '\\u003c') %></script>
     <script src="/js/themeToggle.js"></script>
     <script src="/js/licenses.js"></script>
     <script src="/js/user.js"></script>

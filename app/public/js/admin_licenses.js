@@ -28,6 +28,9 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     document.getElementById('createLicenseForm')?.addEventListener('submit', createLicense);
+    document.getElementById('createUserForm')?.addEventListener('submit', validateUserForm);
+    document.getElementById('license-search')?.addEventListener('keyup', filterLicenses);
+    document.getElementById('status-filter')?.addEventListener('change', filterLicenses);
 });
 
 // The full list is fetched once (fast - served from the server-side cache) and kept
@@ -169,6 +172,10 @@ function populateStatusFilter() {
 
 async function viewLicenseDetails(licenseId) {
     try {
+        // Machines don't depend on the details response, so request both at once.
+        // fetchMachines handles its own errors, so this promise never rejects.
+        const machinesLoaded = fetchMachines(licenseId);
+
         const response = await fetch(`/api/licenses/${licenseId}`, {
             method: 'GET',
             headers: {
@@ -186,8 +193,7 @@ async function viewLicenseDetails(licenseId) {
         // Ensure the machine block is displayed
         document.getElementById('machines-list-block').style.display = 'block';
 
-        // Fetch and display machines associated with the license
-        await fetchMachines(licenseId);
+        await machinesLoaded;
 
         // Scroll to the license details block
         const licenseDetailsBlock = document.getElementById('license-details-block');
@@ -696,18 +702,23 @@ async function renewLicense(licenseId) {
     }
 }
 
-document.addEventListener('DOMContentLoaded', loadLicenses);
 
-// Row buttons carry data-* attributes instead of inline onclick handlers, so
-// server-supplied values never end up inside executable attribute code.
-const rowActions = {
+// Buttons carry data-* attributes instead of inline onclick handlers, so server-supplied
+// values never end up inside executable attribute code and the CSP can forbid inline script.
+const clickActions = {
     'view-license': viewLicenseDetails,
     'deactivate-machine': deactivateMachine,
     'renew-license': renewLicense,
     'delete-license': confirmDeleteLicense,
+    'open-create-license': openCreateLicenseModal,
+    'open-create-user': openCreateUserModal,
+    'close-create-user': closeUserModal,
+    'open-delete-user': openDeleteUserModal,
+    'close-delete-user': closeDeleteUserModal,
+    'delete-selected-user': deleteSelectedUser,
 };
 document.addEventListener('click', event => {
     const button = event.target.closest('[data-action]');
-    const action = button && rowActions[button.dataset.action];
+    const action = button && clickActions[button.dataset.action];
     if (action) action(button.dataset.id);
 });

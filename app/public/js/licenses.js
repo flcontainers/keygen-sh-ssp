@@ -4,6 +4,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Existing initialization code
     loadLicenses();
 
+    document.getElementById('license-search')?.addEventListener('keyup', filterLicenses);
+
     // Close modal when clicking the X or outside the modal
     document.querySelector('.close-modal')?.addEventListener('click', closeModal);
     window.addEventListener('click', (event) => {
@@ -82,6 +84,10 @@ function displayLicenses(licenses) {
 
 async function viewLicenseDetails(licenseId) {
     try {
+        // Machines don't depend on the details response, so request both at once.
+        // fetchMachines handles its own errors, so this promise never rejects.
+        const machinesLoaded = fetchMachines(licenseId);
+
         const response = await fetch(`/api/licenses/${licenseId}`, {
             method: 'GET',
             headers: {
@@ -99,8 +105,7 @@ async function viewLicenseDetails(licenseId) {
         // Ensure the machine block is displayed
         document.getElementById('machines-list-block').style.display = 'block';
 
-        // Fetch and display machines associated with the license
-        await fetchMachines(licenseId);
+        await machinesLoaded;
 
         // Scroll to the license details block
         document.getElementById('license-details-block').scrollIntoView({ behavior: 'smooth' });
@@ -244,16 +249,15 @@ function escapeHtml(str) {
     return div.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-document.addEventListener('DOMContentLoaded', loadLicenses);
 
-// Row buttons carry data-* attributes instead of inline onclick handlers, so
-// server-supplied values never end up inside executable attribute code.
-const rowActions = {
+// Buttons carry data-* attributes instead of inline onclick handlers, so server-supplied
+// values never end up inside executable attribute code and the CSP can forbid inline script.
+const clickActions = {
     'view-license': viewLicenseDetails,
     'deactivate-machine': deactivateMachine,
 };
 document.addEventListener('click', event => {
     const button = event.target.closest('[data-action]');
-    const action = button && rowActions[button.dataset.action];
+    const action = button && clickActions[button.dataset.action];
     if (action) action(button.dataset.id);
 });

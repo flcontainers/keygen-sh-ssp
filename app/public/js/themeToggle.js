@@ -22,5 +22,6 @@ function toggleTheme() {
 // Initialize button text on page load
 window.addEventListener('DOMContentLoaded', () => {
     const toggleBtn = document.getElementById('theme-toggle');
+    toggleBtn.addEventListener('click', toggleTheme);
     toggleBtn.innerHTML = `${currentTheme === 'light' ? '🌙' : '☀️'} ${currentTheme === 'light' ? 'Dark' : 'Light'} Mode`;
 });

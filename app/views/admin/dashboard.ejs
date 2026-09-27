@@ -13,7 +13,7 @@
 </head>
 <body>
     <div class="theme-toggle-container">
-        <button id="theme-toggle" onclick="toggleTheme()" class="theme-toggle-btn"></button>
+        <button id="theme-toggle" class="theme-toggle-btn"></button>
     </div>
     <div class="container">
         <header>
@@ -30,8 +30,8 @@
                     <div class="section-header">
                         <h2>User Information</h2>
                         <div class="button-group">
-                            <button onclick="openCreateUserModal()" class="btn btn-primary">Create User</button>
-                            <button onclick="openDeleteUserModal()" class="btn btn-danger">Delete User</button>
+                            <button data-action="open-create-user" class="btn btn-primary">Create User</button>
+                            <button data-action="open-delete-user" class="btn btn-danger">Delete User</button>
                         </div>
                     </div>
                     <div class="table-responsive">
@@ -54,12 +54,12 @@
                 <div class="licenses-container">
                     <h2>License Information</h2>
                     <div class="search-create-bar">
-                        <input type="text" id="license-search" class="search-input" placeholder="Search by name or key" onkeyup="filterLicenses()">
+                        <input type="text" id="license-search" class="search-input" placeholder="Search by name or key">
                         <div class="button-group">
-                            <select id="status-filter" class="status-filter-select" onchange="filterLicenses()">
+                            <select id="status-filter" class="status-filter-select">
                                 <option value="all">All Statuses</option>
                             </select>
-                            <button class="btn btn-success" onclick="openCreateLicenseModal()">Create License</button>
+                            <button class="btn btn-success" data-action="open-create-license">Create License</button>
                         </div>
                     </div>
                     <div class="table-container">
@@ -85,7 +85,7 @@
                 </div>
 
                 <!-- License Details Block -->
-                <div id="license-details-block" class="license-details-block" style="display: none;">
+                <div id="license-details-block" class="license-details-block" hidden>
                     <h3>License Details</h3>
                     <div id="license-details-content" class="license-details-content">
                         <!-- License details will be loaded here -->
@@ -95,7 +95,7 @@
 
             <!-- Block Three: Machine Information -->
             <section class="machines-content machines-info-block">
-                <div id="machines-list-block" class="machines-list-block" style="display: none;">
+                <div id="machines-list-block" class="machines-list-block" hidden>
                     <div id="machines-container" class="machines-container">
                         <h2>Machines Associated with Selected License</h2>
                         <table id="machines-table" class="machines-table">
@@ -153,9 +153,9 @@
         <!-- Create User Modal -->
         <div id="createUserModal" class="modal">
             <div class="modal-content">
-                <span class="close-modal" onclick="closeUserModal()">&times;</span>
+                <span class="close-modal" data-action="close-create-user">&times;</span>
                 <h2>Create User</h2>
-                <form id="createUserForm" onsubmit="return validateUserForm(event)">
+                <form id="createUserForm">
                     <div class="form-group">
                         <label for="userGroup">Group:</label>
                         <select id="userGroup" name="userGroup" required>
@@ -197,14 +197,14 @@
         <!-- Delete User Modal -->
         <div id="deleteUserModal" class="modal">
             <div class="modal-content">
-                <span class="close-modal" onclick="closeDeleteUserModal()">&times;</span>
+                <span class="close-modal" data-action="close-delete-user">&times;</span>
                 <h2>Delete User</h2>
                 <div class="form-group">
                     <select id="userToDelete" name="userToDelete" required>
                         <option value="">Select a user</option>
                     </select>
                 </div>
-                <button onclick="deleteSelectedUser()" class="btn btn-danger">Delete User</button>
+                <button data-action="delete-selected-user" class="btn btn-danger">Delete User</button>
             </div>
         </div>
 

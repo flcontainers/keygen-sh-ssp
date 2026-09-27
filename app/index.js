@@ -30,9 +30,10 @@ app.set('views', path.join(__dirname, 'views'));
 
 // Security headers. All scripts and styles are same-origin files, so the CSP needs no
 // 'unsafe-inline'; frame-ancestors/X-Frame-Options stop the admin UI being framed (clickjacking).
+// The Cloudflare hosts allow the Web Analytics beacon Cloudflare's proxy injects into pages.
 app.use((req, res, next) => {
   res.set({
-    'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
+    'Content-Security-Policy': "default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self'; img-src 'self' data:; connect-src 'self' https://cloudflareinsights.com; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
     'X-Frame-Options': 'DENY',
     'X-Content-Type-Options': 'nosniff',
     'Referrer-Policy': 'same-origin',

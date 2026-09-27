@@ -1,11 +1,12 @@
 const express = require('express');
 const router = express.Router();
+const { getRoles } = require('../utils/auth');
 
 router.get('/dashboard', (req, res) => {
     const userData = {
         email: req.oidc.user.email,
         username: req.oidc.user.preferred_username || req.oidc.user.name,
-        roles: req.oidc.user?.[process.env.OIDC_ROLES_PROPERTY || 'roles'] || []
+        roles: getRoles(req)
     };
     res.render('user/dashboard', { user: userData });
 });
@@ -16,7 +17,7 @@ if (process.env.NODE_ENV === 'development') {
         res.json({
             user: req.oidc.user,
             rolesProperty: process.env.OIDC_ROLES_PROPERTY,
-            roles: req.oidc.user?.[process.env.OIDC_ROLES_PROPERTY || 'roles'] || []
+            roles: getRoles(req)
         });
     });
 }

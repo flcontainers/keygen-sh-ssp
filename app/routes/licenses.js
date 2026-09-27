@@ -1,8 +1,9 @@
 const express = require('express');
-const axios = require('axios');
 const router = express.Router();
 const { logAdminAction } = require('../utils/logger');
 const cache = require('../utils/cache');
+const { keygen, fetchAllPages } = require('../utils/keygen');
+const { getRoles, isAdmin } = require('../utils/auth');
 
 // TTLs are a safety net for data changed outside this app (e.g. directly in Keygen);
 // writes made through this app patch the affected cache entries directly instead of
@@ -14,6 +15,20 @@ const POLICIES_TTL_MS = 30 * 60 * 1000;
 // Machine state can also change from outside this app (a client SDK activating/checking in
 // a machine directly against Keygen), which we have no write-side hook for - keep this one short.
 const MACHINES_TTL_MS = 30 * 1000;
+// Admin-only lists keep serving their last value for this long after expiry while a
+// background refresh runs, so the admin dashboard doesn't block on a full Keygen crawl
+// every time a TTL lapses. Not used for per-user licenses: those back access checks.
+const ADMIN_LIST_STALE_MS = 30 * 60 * 1000;
+
+function toLicense(license) {
+    return {
+        id: license.id,
+        name: license.attributes.name,
+        key: license.attributes.key,
+        expiry: license.attributes.expiry,
+        status: license.attributes.status,
+    };
+}
 
 // AxiosError carries the full outgoing request config - including the
 // Authorization: Bearer KEYGEN_TOKEN header - as an own enumerable property, so
@@ -30,12 +45,17 @@ function safeErrorInfo(error) {
 // Middleware to attach user information to the request
 function attachUser(req, res, next) {
     const user = req.oidc.user;
-    const roles = req.oidc.user?.[process.env.OIDC_ROLES_PROPERTY || 'roles'] || [];
+    const roles = getRoles(req);
 
     // Licenses are matched to users by email, so an email the IdP explicitly flags as
     // unverified must not be trusted. IdPs that omit the claim are unaffected.
-    if (user.email_verified === false && !roles.includes('Administrator')) {
+    if (user.email_verified === false && !isAdmin(req)) {
         return res.status(403).json({ error: 'Forbidden: email address is not verified' });
+    }
+    // The email is the Keygen license filter; without one the filter would be dropped
+    // and the lookup would match every license in the account.
+    if (typeof user.email !== 'string' || user.email.trim() === '') {
+        return res.status(403).json({ error: 'Forbidden: no email address on this account' });
     }
 
     req.user = {
@@ -43,11 +63,6 @@ function attachUser(req, res, next) {
         roles: roles
     };
     next();
-}
-
-function isAdmin(req) {
-    const roles = req.oidc.user?.[process.env.OIDC_ROLES_PROPERTY || 'roles'] || [];
-    return roles.includes('Administrator');
 }
 
 // Middleware to check admin permissions. Only denials are audit-logged; successful
@@ -59,44 +74,11 @@ function checkAdmin(req, res, next) {
     res.status(403).json({ error: 'Forbidden: Admin access required' });
 }
 
-async function fetchUserLicenses(userEmail) {
-    let licenses = [];
-    let pageNumber = 1;
-    let hasMoreLicenses = true;
-
-    while (hasMoreLicenses) {
-        const response = await axios.get(
-            `${process.env.KEYGEN_URL}/v1/accounts/${process.env.KEYGEN_ACCOUNT_ID}/licenses?page%5Bsize%5D=100&page%5Bnumber%5D=${pageNumber}&user=${encodeURIComponent(userEmail)}`,
-            {
-                headers: {
-                    'Authorization': `Bearer ${process.env.KEYGEN_TOKEN}`,
-                    'Accept': 'application/vnd.api+json',
-                },
-            }
-        );
-
-        if (response.status !== 200) {
-            console.error('[License Service] Error fetching licenses:', response.status);
-            throw Object.assign(new Error('Failed to fetch licenses'), { status: response.status });
-        }
-
-        const data = response.data;
-
-        if (!data || !data.data || data.data.length === 0) {
-            hasMoreLicenses = false;
-        } else {
-            licenses = licenses.concat(data.data.map(license => ({
-                id: license.id,
-                name: license.attributes.name,
-                key: license.attributes.key,
-                expiry: license.attributes.expiry,
-                status: license.attributes.status,
-            })));
-            pageNumber++;
-        }
+function fetchUserLicenses(userEmail) {
+    if (typeof userEmail !== 'string' || userEmail.trim() === '') {
+        return Promise.reject(Object.assign(new Error('Missing user email'), { status: 403 }));
     }
-
-    return licenses;
+    return fetchAllPages('/licenses', { user: userEmail }, toLicense);
 }
 
 // Keygen IDs are UUIDs. Anything else (e.g. "../" segments or query fragments)
@@ -114,6 +96,18 @@ const rejectInvalidId = (req, res, next, value) => {
 router.param('licenseId', rejectInvalidId);
 router.param('machineId', rejectInvalidId);
 router.param('userId', rejectInvalidId);
+
+// Both machine routes share this, so they share one cache entry with one shape.
+function getLicenseMachines(licenseId) {
+    return cache.getOrSet(`machines:license:${licenseId}`, MACHINES_TTL_MS,
+        () => fetchAllPages('/machines', { license: licenseId }, machine => ({
+            id: machine.id,
+            name: machine.attributes.name,
+            ip: machine.attributes.ip,
+            fingerprint: machine.attributes.fingerprint,
+            status: machine.attributes.status
+        })));
+}
 
 function getUserLicenses(userEmail) {
     return cache.getOrSet(`licenses:user:${userEmail}`, LICENSES_TTL_MS, () => fetchUserLicenses(userEmail));
@@ -147,46 +141,12 @@ router.get('/user/licenses', attachUser, async (req, res) => {
 // Fetch all licenses (admin only)
 router.get('/admin/licenses', checkAdmin, attachUser, async (req, res) => {
     try {
-        const allLicenses = await cache.getOrSet('licenses:admin:all', LICENSES_TTL_MS, async () => {
-            let licenses = [];
-            let pageNumber = 1;
-            let hasMoreLicenses = true;
-
-            while (hasMoreLicenses) {
-                const response = await axios.get(
-                    `${process.env.KEYGEN_URL}/v1/accounts/${process.env.KEYGEN_ACCOUNT_ID}/licenses?page%5Bsize%5D=100&page%5Bnumber%5D=${pageNumber}`,
-                    {
-                        headers: {
-                            'Authorization': `Bearer ${process.env.KEYGEN_TOKEN}`,
-                            'Accept': 'application/vnd.api+json',
-                        },
-                    }
-                );
-
-                if (response.status !== 200) {
-                    console.error('[License Service] Error fetching licenses:', response.status);
-                    throw Object.assign(new Error('Failed to fetch licenses'), { status: response.status });
-                }
-
-                const data = response.data;
-
-                if (!data || !data.data || data.data.length === 0) {
-                    hasMoreLicenses = false;
-                } else {
-                    licenses = licenses.concat(data.data.map(license => ({
-                        id: license.id,
-                        name: license.attributes.name,
-                        key: license.attributes.key,
-                        expiry: license.attributes.expiry,
-                        status: license.attributes.status,
-                        ownerId: license.relationships?.owner?.data?.id || 'unknown'
-                    })));
-                    pageNumber++;
-                }
-            }
-
-            return licenses;
-        });
+        const allLicenses = await cache.getOrSet('licenses:admin:all', LICENSES_TTL_MS,
+            () => fetchAllPages('/licenses', {}, license => ({
+                ...toLicense(license),
+                ownerId: license.relationships?.owner?.data?.id || 'unknown'
+            })),
+            ADMIN_LIST_STALE_MS);
 
         res.json({ licenses: allLicenses });
 
@@ -206,31 +166,14 @@ router.get('/licenses/:licenseId', attachUser, async (req, res) => {
 
         const license = await cache.getOrSet(`licenses:detail:${licenseId}`, LICENSES_TTL_MS, async () => {
             // Fetch specific license details
-            const response = await axios.get(
-                `${process.env.KEYGEN_URL}/v1/accounts/${process.env.KEYGEN_ACCOUNT_ID}/licenses/${licenseId}`,
-                {
-                    headers: {
-                        'Authorization': `Bearer ${process.env.KEYGEN_TOKEN}`,
-                        'Accept': 'application/vnd.api+json',
-                    },
-                }
-            );
+            const response = await keygen.get(`/licenses/${licenseId}`);
 
             if (response.status !== 200) {
                 console.error('[License Service] Error fetching license details:', response.status);
                 throw Object.assign(new Error('Failed to fetch license details'), { status: response.status });
             }
 
-            const data = response.data;
-
-            return {
-                id: data.data.id,
-                name: data.data.attributes.name,
-                key: data.data.attributes.key,
-                expiry: data.data.attributes.expiry,
-                status: data.data.attributes.status,
-                // Add any other relevant fields you want to expose
-            };
+            return toLicense(response.data.data);
         });
 
         res.json({ license });
@@ -252,31 +195,7 @@ router.get('/licenses/:licenseId/machines', attachUser, async (req, res) => {
         const { licenseId } = req.params;
         await assertLicenseAccess(req, licenseId);
 
-        const machines = await cache.getOrSet(`machines:license:${licenseId}`, MACHINES_TTL_MS, async () => {
-            const response = await axios.get(
-                `${process.env.KEYGEN_URL}/v1/accounts/${process.env.KEYGEN_ACCOUNT_ID}/licenses/${licenseId}/machines`,
-                {
-                    headers: {
-                        'Authorization': `Bearer ${process.env.KEYGEN_TOKEN}`,
-                        'Accept': 'application/vnd.api+json',
-                    },
-                }
-            );
-
-            if (response.status !== 200) {
-                console.error('[License Service] Error fetching machines:', response.status);
-                throw Object.assign(new Error('Failed to fetch machines'), { status: response.status });
-            }
-
-            return response.data.data.map(machine => ({
-                id: machine.id,
-                name: machine.attributes.name,
-                ip: machine.attributes.ip,
-                fingerprint: machine.attributes.fingerprint,
-                status: machine.attributes.status
-            }));
-        });
-
+        const machines = await getLicenseMachines(licenseId);
         res.json({ machines });
 
     } catch (error) {
@@ -297,15 +216,7 @@ router.delete('/admin/licenses/:licenseId', checkAdmin, attachUser, async (req, 
 
     try {
         // Delete the license
-        const response = await axios.delete(
-            `${process.env.KEYGEN_URL}/v1/accounts/${process.env.KEYGEN_ACCOUNT_ID}/licenses/${licenseId}`,
-            {
-                headers: {
-                    'Authorization': `Bearer ${process.env.KEYGEN_TOKEN}`,
-                    'Accept': 'application/vnd.api+json',
-                },
-            }
-        );
+        const response = await keygen.delete(`/licenses/${licenseId}`);
 
         if (response.status !== 204) {
             console.error('[Backend] Error deleting license:', response.status);
@@ -347,42 +258,12 @@ router.delete('/admin/licenses/:licenseId', checkAdmin, attachUser, async (req, 
 // Fetch groups (admin only)
 router.get('/admin/groups', checkAdmin, attachUser, async (req, res) => {
     try {
-        const allGroups = await cache.getOrSet('groups:admin:all', GROUPS_TTL_MS, async () => {
-            let groups = [];
-            let pageNumber = 1;
-            let hasMoreGroups = true;
-
-            while (hasMoreGroups) {
-                const response = await axios.get(
-                    `${process.env.KEYGEN_URL}/v1/accounts/${process.env.KEYGEN_ACCOUNT_ID}/groups?page%5Bsize%5D=100&page%5Bnumber%5D=${pageNumber}`,
-                    {
-                        headers: {
-                            'Authorization': `Bearer ${process.env.KEYGEN_TOKEN}`,
-                            'Accept': 'application/vnd.api+json',
-                        },
-                    }
-                );
-
-                if (response.status !== 200) {
-                    console.error('[License Service] Error fetching groups:', response.status);
-                    throw Object.assign(new Error('Failed to fetch groups'), { status: response.status });
-                }
-
-                const data = response.data;
-
-                if (!data || !data.data || data.data.length === 0) {
-                    hasMoreGroups = false;
-                } else {
-                    groups = groups.concat(data.data.map(group => ({
-                        id: group.id,
-                        name: group.attributes.name,
-                    })));
-                    pageNumber++;
-                }
-            }
-
-            return groups;
-        });
+        const allGroups = await cache.getOrSet('groups:admin:all', GROUPS_TTL_MS,
+            () => fetchAllPages('/groups', {}, group => ({
+                id: group.id,
+                name: group.attributes.name,
+            })),
+            ADMIN_LIST_STALE_MS);
 
         res.json({ groups: allGroups });
 
@@ -397,42 +278,12 @@ router.get('/admin/groups', checkAdmin, attachUser, async (req, res) => {
 // Fetch policies (admin only)
 router.get('/admin/policies', checkAdmin, attachUser, async (req, res) => {
     try {
-        const allPolicies = await cache.getOrSet('policies:admin:all', POLICIES_TTL_MS, async () => {
-            let policies = [];
-            let pageNumber = 1;
-            let hasMorePolicies = true;
-
-            while (hasMorePolicies) {
-                const response = await axios.get(
-                    `${process.env.KEYGEN_URL}/v1/accounts/${process.env.KEYGEN_ACCOUNT_ID}/policies?page%5Bsize%5D=100&page%5Bnumber%5D=${pageNumber}`,
-                    {
-                        headers: {
-                            'Authorization': `Bearer ${process.env.KEYGEN_TOKEN}`,
-                            'Accept': 'application/vnd.api+json',
-                        },
-                    }
-                );
-
-                if (response.status !== 200) {
-                    console.error('[License Service] Error fetching policies:', response.status);
-                    throw Object.assign(new Error('Failed to fetch policies'), { status: response.status });
-                }
-
-                const data = response.data;
-
-                if (!data || !data.data || data.data.length === 0) {
-                    hasMorePolicies = false;
-                } else {
-                    policies = policies.concat(data.data.map(policy => ({
-                        id: policy.id,
-                        name: policy.attributes.name,
-                    })));
-                    pageNumber++;
-                }
-            }
-
-            return policies;
-        });
+        const allPolicies = await cache.getOrSet('policies:admin:all', POLICIES_TTL_MS,
+            () => fetchAllPages('/policies', {}, policy => ({
+                id: policy.id,
+                name: policy.attributes.name,
+            })),
+            ADMIN_LIST_STALE_MS);
 
         res.json({ policies: allPolicies });
 
@@ -447,42 +298,12 @@ router.get('/admin/policies', checkAdmin, attachUser, async (req, res) => {
 // Fetch users (admin only)
 router.get('/admin/users', checkAdmin, attachUser, async (req, res) => {
     try {
-        const allUsers = await cache.getOrSet('users:admin:all', USERS_TTL_MS, async () => {
-            let users = [];
-            let pageNumber = 1;
-            let hasMoreUsers = true;
-
-            while (hasMoreUsers) {
-                const response = await axios.get(
-                    `${process.env.KEYGEN_URL}/v1/accounts/${process.env.KEYGEN_ACCOUNT_ID}/users?page%5Bsize%5D=100&page%5Bnumber%5D=${pageNumber}`,
-                    {
-                        headers: {
-                            'Authorization': `Bearer ${process.env.KEYGEN_TOKEN}`,
-                            'Accept': 'application/vnd.api+json',
-                        },
-                    }
-                );
-
-                if (response.status !== 200) {
-                    console.error('[License Service] Error fetching users:', response.status);
-                    throw Object.assign(new Error('Failed to fetch users'), { status: response.status });
-                }
-
-                const data = response.data;
-
-                if (!data || !data.data || data.data.length === 0) {
-                    hasMoreUsers = false;
-                } else {
-                    users = users.concat(data.data.map(user => ({
-                        id: user.id,
-                        firstName: user.attributes.firstName,
-                    })));
-                    pageNumber++;
-                }
-            }
-
-            return users;
-        });
+        const allUsers = await cache.getOrSet('users:admin:all', USERS_TTL_MS,
+            () => fetchAllPages('/users', {}, user => ({
+                id: user.id,
+                firstName: user.attributes.firstName,
+            })),
+            ADMIN_LIST_STALE_MS);
 
         res.json({ users: allUsers });
 
@@ -539,17 +360,7 @@ router.post('/admin/licenses', checkAdmin, attachUser, async (req, res) => {
     //console.log('Sending license data to Keygen:', licenseData); // Add this line for debugging
 
     try {
-        const response = await axios.post(
-            `${process.env.KEYGEN_URL}/v1/accounts/${process.env.KEYGEN_ACCOUNT_ID}/licenses`,
-            licenseData,
-            {
-                headers: {
-                    'Authorization': `Bearer ${process.env.KEYGEN_TOKEN}`,
-                    'Accept': 'application/vnd.api+json',
-                    'Content-Type': 'application/vnd.api+json',
-                },
-            }
-        );
+        const response = await keygen.post('/licenses', licenseData);
 
         if (response.status !== 201) {
             console.error('[License Service] Error creating license:', response.status);
@@ -632,19 +443,10 @@ router.post('/admin/createuser', checkAdmin, attachUser, async (req, res) => {
     console.log('[Pre-Request] Attempting user creation for:', userEmail);
  
     try {
-        const response = await axios.post(
-            `${process.env.KEYGEN_URL}/v1/accounts/${process.env.KEYGEN_ACCOUNT_ID}/users`,
-            userData,
-            {
-                headers: {
-                    'Authorization': `Bearer ${process.env.KEYGEN_TOKEN}`,
-                    'Accept': 'application/vnd.api+json',
-                    'Content-Type': 'application/vnd.api+json'
-                },
-                maxRedirects: 0,
-                validateStatus: null
-            }
-        );
+        const response = await keygen.post('/users', userData, {
+            maxRedirects: 0,
+            validateStatus: null
+        });
         
         console.log('[Response] Status:', response.status);
 
@@ -699,43 +501,12 @@ router.post('/fetchMachines', attachUser, async (req, res) => {
     try {
         await assertLicenseAccess(req, licenseId);
 
-        const machines = await cache.getOrSet(`machines:license:${licenseId}`, MACHINES_TTL_MS, async () => {
-            // Fetch machines associated with the license key
-            const machinesResponse = await axios.get(
-                `${process.env.KEYGEN_URL}/v1/accounts/${process.env.KEYGEN_ACCOUNT_ID}/machines?limit=100&license=${licenseId}`,
-                {
-                    headers: {
-                        'Authorization': `Bearer ${process.env.KEYGEN_TOKEN}`,
-                        'Accept': 'application/vnd.api+json',
-                    },
-                }
-            );
-
-            if (machinesResponse.status !== 200) {
-                console.error('[Backend] Error fetching machines:', machinesResponse.status);
-                throw Object.assign(new Error('License check error'), { status: 404 });
-            }
-
-            const machinesData = machinesResponse.data;
-
-            if (machinesData.errors) {
-                throw Object.assign(new Error('Machines fetch error'), { apiErrors: machinesData.errors });
-            }
-
-            if (machinesData.data.length === 0) {
-                throw Object.assign(new Error('Machine not found'), {
-                    apiErrors: [{ title: 'Machine not found', detail: 'No machines found associated with the provided license key.' }]
-                });
-            }
-
-            // Extract the necessary attributes from the machines
-            return machinesData.data.map(machine => ({
-                id: machine.id,
-                name: machine.attributes.name,
-                ip: machine.attributes.ip,
-                fingerprint: machine.attributes.fingerprint,
-            }));
-        });
+        const machines = await getLicenseMachines(licenseId);
+        if (machines.length === 0) {
+            return res.json({
+                errors: [{ title: 'Machine not found', detail: 'No machines found associated with the provided license key.' }]
+            });
+        }
 
         console.log('[Backend] Return OK');
         res.json({ machines });
@@ -757,21 +528,13 @@ router.post('/fetchMachines', attachUser, async (req, res) => {
         // Handle any unexpected errors in the entire chain
         console.error('[Backend] Server Error:', safeErrorInfo(error));
         res.status(500).json({
-            errors: [{ title: 'Server Error', detail: error.message }],
+            errors: [{ title: 'Server Error', detail: 'Internal server error' }],
         });
     }
 });
 
 async function getMachineLicenseId(machineId) {
-    const response = await axios.get(
-        `${process.env.KEYGEN_URL}/v1/accounts/${process.env.KEYGEN_ACCOUNT_ID}/machines/${machineId}`,
-        {
-            headers: {
-                'Authorization': `Bearer ${process.env.KEYGEN_TOKEN}`,
-                'Accept': 'application/vnd.api+json',
-            },
-        }
-    );
+    const response = await keygen.get(`/machines/${machineId}`);
 
     if (response.status !== 200) {
         throw Object.assign(new Error('Failed to fetch machine'), { status: response.status });
@@ -790,15 +553,7 @@ router.delete('/deactivateMachine/:machineId', attachUser, async (req, res) => {
         const licenseId = await getMachineLicenseId(machineId);
         await assertLicenseAccess(req, licenseId);
 
-        const response = await axios.delete(
-            `${process.env.KEYGEN_URL}/v1/accounts/${process.env.KEYGEN_ACCOUNT_ID}/machines/${machineId}`,
-            {
-                headers: {
-                    'Authorization': `Bearer ${process.env.KEYGEN_TOKEN}`,
-                    'Accept': 'application/vnd.api+json',
-                },
-            }
-        );
+        const response = await keygen.delete(`/machines/${machineId}`);
 
         if (response.status !== 204) {
             console.error('[Backend] Error deactivating machine:', response.status);
@@ -827,15 +582,7 @@ router.delete('/admin/users/:userId', checkAdmin, attachUser, async (req, res) =
     const adminEmail = req.user.email;
 
     try {
-        const response = await axios.delete(
-            `${process.env.KEYGEN_URL}/v1/accounts/${process.env.KEYGEN_ACCOUNT_ID}/users/${userId}`,
-            {
-                headers: {
-                    'Authorization': `Bearer ${process.env.KEYGEN_TOKEN}`,
-                    'Accept': 'application/vnd.api+json',
-                },
-            }
-        );
+        const response = await keygen.delete(`/users/${userId}`);
 
         if (response.status !== 204) {
             console.error('[Backend] Error deleting user:', response.status);
@@ -868,16 +615,7 @@ router.post('/admin/renewlicense/:licenseId', checkAdmin, attachUser, async (req
     const adminEmail = req.user.email;
 
     try {
-        const response = await axios.post(
-            `${process.env.KEYGEN_URL}/v1/accounts/${process.env.KEYGEN_ACCOUNT_ID}/licenses/${licenseId}/actions/renew`,
-            {},
-            {
-                headers: {
-                    'Authorization': `Bearer ${process.env.KEYGEN_TOKEN}`,
-                    'Accept': 'application/vnd.api+json',
-                },
-            }
-        );
+        const response = await keygen.post(`/licenses/${licenseId}/actions/renew`);
 
         if (response.status !== 200) {
             console.error('[Backend] Error renewing license:', response.status);
@@ -891,13 +629,7 @@ router.post('/admin/renewlicense/:licenseId', checkAdmin, attachUser, async (req
         // directly from Keygen's response instead of dropping every license-related cache.
         const renewed = response.data?.data;
         if (renewed) {
-            cache.set(`licenses:detail:${licenseId}`, {
-                id: renewed.id,
-                name: renewed.attributes.name,
-                key: renewed.attributes.key,
-                expiry: renewed.attributes.expiry,
-                status: renewed.attributes.status,
-            }, LICENSES_TTL_MS);
+            cache.set(`licenses:detail:${licenseId}`, toLicense(renewed), LICENSES_TTL_MS);
             cache.update('licenses:admin:all', list => list.map(l =>
                 l.id === renewed.id
                     ? { ...l, expiry: renewed.attributes.expiry, status: renewed.attributes.status }

@@ -1,9 +1,8 @@
 require('dotenv').config();
 const express = require('express');
-const session = require('express-session');
 const { auth, requiresAuth } = require('express-openid-connect');
 const path = require('path');
-const SQLiteStore = require('connect-sqlite3')(session);
+const { afterCallback, revalidateRoles, requireAdmin } = require('./utils/auth');
 
 const app = express();
 
@@ -12,10 +11,11 @@ if (process.env.NODE_ENV === 'production') {
   // Enable trust proxy in production
   app.set('trust proxy', true);
   
-  // Force HTTPS in production
+  // Force HTTPS in production. Redirects to the configured origin rather than the request's
+  // Host header, which the client controls and would otherwise make this an open redirect.
   app.use((req, res, next) => {
     if (!req.secure) {
-      return res.redirect(301, `https://${req.headers.host}${req.url}`);
+      return res.redirect(301, `${baseURL}${req.originalUrl}`);
     }
     next();
   });
@@ -28,38 +28,25 @@ if (process.env.NODE_ENV === 'production') {
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-// Create store based on environment
-let store;
-if (process.env.NODE_ENV === 'production') {
-  store = new SQLiteStore({
-    dir: './sessions', // Directory where SQLite db will be saved
-    db: 'sessions.db', // Database filename
-    table: 'sessions', // Table name to use
+// Security headers. All scripts and styles are same-origin files, so the CSP needs no
+// 'unsafe-inline'; frame-ancestors/X-Frame-Options stop the admin UI being framed (clickjacking).
+app.use((req, res, next) => {
+  res.set({
+    'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
+    'X-Frame-Options': 'DENY',
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'same-origin',
   });
-  console.log('Using SQLite session store for production');
-} else {
-  store = new session.MemoryStore();
-  console.log('Using Memory session store for development');
-}
-
-// Session setup
-app.use(
-  session({
-    store: store,
-    secret: process.env.SESSION,
-    resave: false,
-    saveUninitialized: true,
-    cookie: {
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
-      secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
-      sameSite: 'lax'
-    },
-    rolling: true // Resets the cookie expiration on every response
-  })
-);
+  if (process.env.NODE_ENV === 'production') {
+    res.set('Strict-Transport-Security', 'max-age=31536000');
+  }
+  next();
+});
 
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Sessions are handled entirely by express-openid-connect (encrypted cookie, see auth() below).
 
 /**
  * OIDC_ROLES_PROPERTY: Name of the property in the OIDC user payload that contains user roles.
@@ -131,8 +118,11 @@ const oidcConfig = {
   authRequired: false,
   authorizationParams: {
     response_type: 'code',
-    scope: 'openid profile email'
+    // offline_access asks the IdP for a refresh token, which is how admin roles get
+    // re-verified mid-session (see utils/auth.js).
+    scope: 'openid profile email offline_access'
   },
+  afterCallback,
   // ensure the library uses the exact callback path derived from env
   routes: {
     callback: callbackPath
@@ -142,16 +132,16 @@ const oidcConfig = {
 // Initialize OIDC middleware
 app.use(auth(oidcConfig));
 
-// Middleware to check client role
-function checkClientRole(role) {
-  return (req, res, next) => {
-    const rolesProperty = process.env.OIDC_ROLES_PROPERTY || 'roles';
-    const clientRoles = req.oidc.user?.[rolesProperty] || [];
-    if (clientRoles.includes(role)) {
-      return next();
-    }
-    res.status(403).send('Forbidden: You do not have access to this resource.');
-  };
+// Re-verify admin roles with the IdP so a revoked admin loses access mid-session
+app.use(revalidateRoles);
+
+// CSRF defence for the cookie-authenticated API: browsers always send Origin on cross-origin
+// and same-origin non-GET fetches, so a state-changing request must come from this app's own
+// origin. SameSite=Lax alone doesn't stop same-site (sibling subdomain) pages.
+function requireSameOrigin(req, res, next) {
+  if (req.method === 'GET' || req.method === 'HEAD') return next();
+  if (req.get('Origin') === baseURL) return next();
+  res.status(403).json({ error: 'Forbidden: cross-origin request' });
 }
 
 // Route handlers
@@ -159,11 +149,14 @@ const userRoutes = require('./routes/user');
 const adminRoutes = require('./routes/admin');
 const licenseRoutes = require('./routes/licenses');
 
+// Checked before any auth so cross-origin writes are refused outright
+app.use('/api', requireSameOrigin);
+
 // Basic authentication for user routes
 app.use('/', requiresAuth(), userRoutes);
 
 // Admin routes require both authentication and admin role
-app.use('/admin', requiresAuth(), checkClientRole('Administrator'), adminRoutes);
+app.use('/admin', requiresAuth(), requireAdmin, adminRoutes);
 
 // Redirect root to user dashboard
 app.get('/', requiresAuth(), (req, res) => {

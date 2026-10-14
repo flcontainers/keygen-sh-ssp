@@ -519,8 +519,12 @@ async function fetchMachines(licenseId) {
         displayMachines(data.machines);
     } catch (error) {
         console.error('Error fetching machines:', error);
-        document.getElementById('machines-container').innerHTML = `
-            <p class="error-message">Failed to load machines. Please try again later.</p>
+        // Write into the tbody rather than replacing the container: the table must survive
+        // so later loads can render into it (and the user view has no container at all).
+        document.querySelector('#machines-table tbody').innerHTML = `
+            <tr>
+                <td colspan="5" class="error-message">Failed to load machines. Please try again later.</td>
+            </tr>
         `;
     }
 }

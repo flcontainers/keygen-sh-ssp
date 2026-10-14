@@ -108,7 +108,10 @@ async function viewLicenseDetails(licenseId) {
         await machinesLoaded;
 
         // Scroll to the license details block
-        document.getElementById('license-details-block').scrollIntoView({ behavior: 'smooth' });
+        const licenseDetailsBlock = document.getElementById('license-details-block');
+        // deactivateMachine reads this back to refresh the machine list
+        licenseDetailsBlock.setAttribute('data-license-id', licenseId);
+        licenseDetailsBlock.scrollIntoView({ behavior: 'smooth' });
     } catch (error) {
         console.error('Error loading license details:', error);
         alert('Failed to load license details. Please try again later.');
@@ -152,8 +155,12 @@ async function fetchMachines(licenseId) {
         displayMachines(data.machines);
     } catch (error) {
         console.error('Error fetching machines:', error);
-        document.getElementById('machines-container').innerHTML = `
-            <p class="error-message">Failed to load machines. Please try again later.</p>
+        // Write into the tbody rather than replacing the container: the table must survive
+        // so later loads can render into it (and the user view has no container at all).
+        document.querySelector('#machines-table tbody').innerHTML = `
+            <tr>
+                <td colspan="5" class="error-message">Failed to load machines. Please try again later.</td>
+            </tr>
         `;
     }
 }
